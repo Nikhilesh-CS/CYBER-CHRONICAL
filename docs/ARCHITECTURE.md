@@ -53,3 +53,18 @@ All collected content is hostile input.
 ## Confidence is not severity
 
 Confidence describes how strongly evidence supports a claim. Severity describes potential impact. A catastrophic but weakly supported report can be critical severity and developing confidence at the same time; the interface and data model must preserve both dimensions.
+
+## Implemented ingestion boundary
+
+The Section 3 backend now lives in `services/api` and implements:
+
+- approved source records with explicit enablement;
+- one pipeline run and fetch record per attempted retrieval;
+- content-addressed raw artifacts keyed by source, canonical URL, and exact SHA-256 bytes;
+- source-owned normalized document revisions;
+- many-to-many provenance edges between documents and the raw feed artifacts that contained them;
+- bounded RSS/Atom collection, manual redirects, exact host aliases, public-IP-only DNS resolution, no environment proxy use, no compression, content limits, type sniffing, and hardened XML parsing;
+- conditional ETag/Last-Modified requests, parser quarantine, audit events, health/status APIs, and an optional bounded scheduler;
+- versioned migrations, including PostgreSQL immutability triggers for raw artifacts and audit events.
+
+The scheduler is disabled by default. Enabling it does not bypass source review: each source is created disabled and must pass the explicit DNS/IP validation endpoint first.

@@ -14,6 +14,10 @@ The repository currently contains the first runnable product increment: a polish
 - Search, severity filters, notifications, keyboard shortcut, and device-local saved stories
 - Responsive laptop layouts for 1366×768 and larger displays
 - Clear labeling that prototype incidents are simulated
+- Trusted-ingestion API with a reviewed source registry
+- Immutable raw artifacts, retrieval history, document revisions, and provenance edges
+- SSRF-aware collection policy, parser quarantine, conditional requests, and a disabled-by-default scheduler
+- Alembic migrations for SQLite development and PostgreSQL production
 
 The interface deliberately does not claim that fixture intelligence is live or that AI-generated conclusions are verified facts.
 
@@ -36,12 +40,14 @@ npm test
 
 1. Product foundation and laptop newsroom shell — complete
 2. Primary intelligence views and evidence reader — complete
-3. Trusted-source registry, storage, and scheduled collection — planned
+3. Trusted-source registry, storage, and scheduled collection — offline laptop gate complete
 4. Deduplication, entity/IOC extraction, and story clustering — planned
 5. Claim-level corroboration, confidence, and evidence-grounded drafting — planned
 6. Alerts, briefings, operations, and security hardening — planned
 
 See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the staged acceptance gates and technical boundaries.
+
+Backend setup and controls are documented in [services/api/README.md](services/api/README.md) and [docs/SOURCE_POLICY.md](docs/SOURCE_POLICY.md).
 
 ## Editorial principles
 

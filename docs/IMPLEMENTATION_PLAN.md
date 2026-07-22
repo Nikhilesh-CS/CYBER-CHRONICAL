@@ -23,12 +23,14 @@ Acceptance gate: a laptop user can filter current events, inspect evidence and m
 
 ## Section 3 — Trusted ingestion foundation
 
-Status: next.
+Status: offline laptop gate complete.
 
 - Add FastAPI, PostgreSQL, migrations, a source registry, raw-artifact preservation, rate-limited RSS/API collectors, normalization, exact deduplication, job health, and audit events.
 - Begin with 10–20 authoritative government, vulnerability-authority, and vendor feeds.
 
 Acceptance gate: repeated scheduled runs ingest the approved source set without duplicate artifacts, and every normalized document points to an immutable raw artifact.
+
+Checkpoint result: deterministic repeated-run fixtures now produce separate run/fetch history, exact artifact reuse, immutable changed responses, document revisions, and provenance edges. The local API migrates successfully and starts with all reviewed source candidates disabled. PostgreSQL integration, parser subprocess isolation, and OS/container egress enforcement remain required before unattended live collection is considered production-ready.
 
 ## Section 4 — Correlation and deterministic intelligence
 

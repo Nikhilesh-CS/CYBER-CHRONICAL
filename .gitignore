@@ -40,3 +40,10 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+.venv/
+*.db
+*.db-shm
+*.db-wal
+__pycache__/
+.pytest_cache/
+.coverage

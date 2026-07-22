@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cyber-chronicle-api"
+version = "0.1.0"
+description = "Trusted ingestion and provenance API for Cyber Chronicle"
+requires-python = ">=3.12"
+dependencies = [
+  "alembic>=1.16,<2",
+  "aiohttp>=3.11,<4",
+  "apscheduler>=3.11,<4",
+  "defusedxml>=0.7,<1",
+  "fastapi>=0.116,<1",
+  "pydantic-settings>=2.10,<3",
+  "psycopg[binary]>=3.2,<4",
+  "sqlalchemy>=2.0,<3",
+  "uvicorn[standard]>=0.35,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28,<1",
+  "pytest>=8.4,<9",
+  "pytest-asyncio>=1.1,<2",
+  "ruff>=0.12,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cyber_chronicle"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
