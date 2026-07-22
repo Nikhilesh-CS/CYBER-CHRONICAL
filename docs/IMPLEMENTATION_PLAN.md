@@ -30,7 +30,7 @@ Status: offline laptop gate complete.
 
 Acceptance gate: repeated scheduled runs ingest the approved source set without duplicate artifacts, and every normalized document points to an immutable raw artifact.
 
-Checkpoint result: deterministic repeated-run fixtures now produce separate run/fetch history, exact artifact reuse, immutable changed responses, document revisions, and provenance edges. The local API migrates successfully and starts with all reviewed source candidates disabled. PostgreSQL integration, parser subprocess isolation, and OS/container egress enforcement remain required before unattended live collection is considered production-ready.
+Checkpoint result: deterministic repeated-run fixtures now produce separate run/fetch history, exact artifact reuse, immutable changed responses, document revisions, and provenance edges. PostgreSQL 16 migrations, constraints, immutability triggers, downgrade/upgrade cycling, and binary/JSON/timezone round-trips pass against a disposable real server. Parsing runs through a strict bounded subprocess. The local API starts with all reviewed source candidates disabled. Windows Job Object/container enforcement, OS-level egress denial, multi-worker concurrency leases, and terms/robots snapshot monitoring remain required before unattended live collection is considered production-ready.
 
 ## Section 4 — Correlation and deterministic intelligence
 

@@ -24,8 +24,12 @@ async def run_due_sources(settings: Settings) -> None:
         due_ids = [
             source.id
             for source in candidates
-            if source.last_attempt_at is None
-            or source.last_attempt_at <= now - timedelta(seconds=source.poll_interval_seconds)
+            if (
+                source.next_attempt_at <= now
+                if source.next_attempt_at is not None
+                else source.last_attempt_at is None
+                or source.last_attempt_at <= now - timedelta(seconds=source.poll_interval_seconds)
+            )
         ]
 
     for source_id in due_ids:

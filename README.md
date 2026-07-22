@@ -16,8 +16,8 @@ The repository currently contains the first runnable product increment: a polish
 - Clear labeling that prototype incidents are simulated
 - Trusted-ingestion API with a reviewed source registry
 - Immutable raw artifacts, retrieval history, document revisions, and provenance edges
-- SSRF-aware collection policy, parser quarantine, conditional requests, and a disabled-by-default scheduler
-- Alembic migrations for SQLite development and PostgreSQL production
+- SSRF-aware collection policy, bounded subprocess parsing, parser quarantine, conditional requests, retry backoff, and a disabled-by-default scheduler
+- Alembic migrations for SQLite development and PostgreSQL production, verified against a disposable PostgreSQL 16 server
 
 The interface deliberately does not claim that fixture intelligence is live or that AI-generated conclusions are verified facts.
 
@@ -33,8 +33,10 @@ npm run dev
 Production verification:
 
 ```powershell
-npm test
+.\scripts\verify-all.ps1
 ```
+
+The full gate runs backend lint and unit tests, a real PostgreSQL migration/constraint cycle in Docker, and the frontend lint/build/render tests.
 
 ## Delivery sections
 

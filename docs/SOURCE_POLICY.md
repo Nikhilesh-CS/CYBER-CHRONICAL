@@ -29,14 +29,15 @@ No candidate is enabled automatically by seeding the registry.
 - DTDs, entities, malformed XML, and excessive entry counts quarantine the source artifact from normalization.
 - Error records contain bounded error codes and types, never attacker-controlled response bodies.
 - A repeated retrieval remains visible as another fetch record even when its immutable artifact is reused.
+- Transient failures use bounded scheduled backoff; numeric `Retry-After` values are clamped from one minute through one day.
+- Permanent HTTP or policy failures pause immediately, and six repeated transient failures pause for review.
 
 ## Production activation blockers
 
 The laptop gate is not permission for unattended production collection. Production activation additionally requires:
 
-- PostgreSQL migration and constraint tests against a real server;
-- parser subprocess/container isolation with CPU, memory, wall-time, file, and network limits;
+- Windows Job Object or container enforcement for parser CPU, memory, descendant-process, file, and network limits;
 - operating-system or container egress rules denying private and metadata networks;
 - robots and terms snapshot monitoring;
-- rate-limit and retry policy tests against controlled network fixtures;
+- cross-process collection leases or database advisory locks before multiple API workers are allowed;
 - backup/restore and append-only audit verification.

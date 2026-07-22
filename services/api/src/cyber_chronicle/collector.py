@@ -11,9 +11,17 @@ from .security import PinnedPublicResolver, SourceNetworkPolicy, URLPolicy
 
 
 class CollectionError(RuntimeError):
-    def __init__(self, code: str, message: str | None = None) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str | None = None,
+        response: FetchResponse | None = None,
+        redirect_chain: list[str] | None = None,
+    ) -> None:
         super().__init__(message or code)
         self.code = code
+        self.response = response
+        self.redirect_chain = redirect_chain or []
 
 
 @dataclass(frozen=True)
@@ -101,7 +109,7 @@ class SafeHttpCollector:
         for redirect_count in range(self.max_redirects + 1):
             response = await self.transport.get(current, conditional_headers or {}, timeout_seconds, max_bytes)
             if response.status not in {301, 302, 303, 307, 308}:
-                self._validate_response(response)
+                self._validate_response(response, redirect_chain)
                 return CollectionResult(response=response, redirect_chain=redirect_chain)
             if redirect_count >= self.max_redirects:
                 raise CollectionError("too_many_redirects")
@@ -118,14 +126,17 @@ class SafeHttpCollector:
             current = next_url
         raise CollectionError("too_many_redirects")
 
-    def _validate_response(self, response: FetchResponse) -> None:
+    def _validate_response(self, response: FetchResponse, redirect_chain: list[str] | None = None) -> None:
         if response.status == 304:
             return
+        content_encoding = response.headers.get("content-encoding", "identity").lower()
+        if content_encoding not in {"", "identity"}:
+            raise CollectionError("content_encoding_forbidden", response=response, redirect_chain=redirect_chain)
         if response.status != 200:
-            raise CollectionError(f"http_{response.status}")
+            raise CollectionError(f"http_{response.status}", response=response, redirect_chain=redirect_chain)
         media_type = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
         if media_type not in ALLOWED_MEDIA_TYPES:
-            raise CollectionError("content_type_forbidden")
+            raise CollectionError("content_type_forbidden", response=response, redirect_chain=redirect_chain)
         prefix = response.body.lstrip()[:64].lower()
         if not prefix.startswith(b"<?xml") and not prefix.startswith(b"<rss") and not prefix.startswith(b"<feed"):
-            raise CollectionError("content_sniff_failed")
+            raise CollectionError("content_sniff_failed", response=response, redirect_chain=redirect_chain)

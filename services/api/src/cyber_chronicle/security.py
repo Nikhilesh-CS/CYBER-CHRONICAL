@@ -4,7 +4,7 @@ import asyncio
 import ipaddress
 import socket
 from dataclasses import dataclass
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 from aiohttp.abc import AbstractResolver
 
@@ -31,19 +31,29 @@ class URLPolicy:
     def validate(self, url: str, policy: SourceNetworkPolicy) -> str:
         if any(character in url for character in ("\\", "\r", "\n", "\x00")):
             raise CollectorPolicyError("url_contains_forbidden_characters")
-        parsed = urlsplit(url)
+        try:
+            parsed = urlsplit(url)
+            parsed.port
+            host = (parsed.hostname or "").encode("idna").decode("ascii").lower().rstrip(".")
+        except (UnicodeError, ValueError) as exc:
+            raise CollectorPolicyError("url_parse_failed") from exc
         if parsed.username or parsed.password:
             raise CollectorPolicyError("url_credentials_forbidden")
         if parsed.scheme not in ({"https", "http"} if policy.allow_http else {"https"}):
             raise CollectorPolicyError("url_scheme_forbidden")
-        host = (parsed.hostname or "").encode("idna").decode("ascii").lower().rstrip(".")
         if host not in policy.allowed_hosts:
             raise CollectorPolicyError("host_not_registered")
         port = parsed.port or (443 if parsed.scheme == "https" else 80)
         allowed_ports = set(policy.allowed_ports) | ({80} if policy.allow_http else set())
         if port not in allowed_ports:
             raise CollectorPolicyError("port_not_registered")
-        return canonicalize_url(url)
+        sensitive_keys = {"api_key", "apikey", "access_token", "token", "signature", "sig", "password", "secret"}
+        if any(key.lower() in sensitive_keys for key, _value in parse_qsl(parsed.query, keep_blank_values=True)):
+            raise CollectorPolicyError("sensitive_query_credentials_forbidden")
+        try:
+            return canonicalize_url(url)
+        except (UnicodeError, ValueError) as exc:
+            raise CollectorPolicyError("url_canonicalization_failed") from exc
 
 
 def validate_public_ip(address: str) -> str:

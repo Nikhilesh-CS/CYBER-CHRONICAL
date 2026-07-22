@@ -58,6 +58,7 @@ class Source(Base):
     consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
     etag: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_modified: Mapped[str | None] = mapped_column(Text, nullable=True)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
@@ -89,6 +90,9 @@ class RawArtifact(Base):
     __table_args__ = (
         UniqueConstraint("source_id", "canonical_url_hash", "sha256", name="artifact_identity"),
         CheckConstraint("byte_length >= 0", name="nonnegative_byte_length"),
+        CheckConstraint("byte_length = length(payload)", name="payload_length_matches"),
+        CheckConstraint("length(sha256) = 32", name="sha256_length"),
+        CheckConstraint("length(canonical_url_hash) = 32", name="canonical_url_hash_length"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
@@ -140,6 +144,8 @@ class NormalizedDocument(Base):
             postgresql_where=text("superseded_at IS NULL"),
         ),
         CheckConstraint("revision >= 1", name="positive_revision"),
+        CheckConstraint("length(identity_hash) = 32", name="identity_hash_length"),
+        CheckConstraint("length(content_hash) = 32", name="content_hash_length"),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)

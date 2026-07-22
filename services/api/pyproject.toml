@@ -34,6 +34,7 @@ packages = ["src/cyber_chronicle"]
 addopts = "-q"
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = ["integration: requires a disposable PostgreSQL test database"]
 
 [tool.ruff]
 line-length = 110

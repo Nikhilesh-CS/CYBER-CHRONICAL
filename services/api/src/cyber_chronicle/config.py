@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     max_redirects: int = Field(default=3, ge=0, le=5)
     scheduler_enabled: bool = False
     scheduler_scan_seconds: int = Field(default=60, ge=15, le=3600)
+    parser_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
+    parser_max_entries: int = Field(default=2000, ge=1, le=2000)
+    parser_max_output_bytes: int = Field(default=32 * 1024 * 1024, gt=0, le=128 * 1024 * 1024)
+    parser_max_stderr_bytes: int = Field(default=64 * 1024, gt=0, le=1024 * 1024)
 
 
 @lru_cache

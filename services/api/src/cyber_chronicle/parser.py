@@ -73,6 +73,9 @@ def parse_feed(payload: bytes, source_url: str, max_entries: int = 2000) -> list
     except Exception as exc:  # defusedxml raises several security-specific subclasses
         raise FeedParseError("malformed_or_unsafe_xml") from exc
 
+    if _local_name(root.tag) not in {"rss", "feed", "rdf"}:
+        raise FeedParseError("unsupported_feed_root")
+
     entries = [node for node in root.iter() if _local_name(node.tag) in {"item", "entry"}]
     if len(entries) > max_entries:
         raise FeedParseError("too_many_feed_entries")
@@ -84,7 +87,12 @@ def parse_feed(payload: bytes, source_url: str, max_entries: int = 2000) -> list
         link = _entry_link(entry)
         if not title or not link:
             continue
-        canonical_url = canonicalize_url(urljoin(source_url, link))
+        try:
+            canonical_url = canonicalize_url(urljoin(source_url, link))
+        except (UnicodeError, ValueError) as exc:
+            raise FeedParseError("invalid_feed_entry") from exc
+        if canonical_url.split(":", 1)[0] not in {"http", "https"}:
+            raise FeedParseError("invalid_feed_entry")
         summary = _child_text(entry, "summary", "description")[:100_000]
         body = _child_text(entry, "content", "encoded")[:2_000_000] or summary
         published = _parse_time(_child_text(entry, "published", "pubdate", "updated"))

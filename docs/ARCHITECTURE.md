@@ -65,6 +65,10 @@ The Section 3 backend now lives in `services/api` and implements:
 - many-to-many provenance edges between documents and the raw feed artifacts that contained them;
 - bounded RSS/Atom collection, manual redirects, exact host aliases, public-IP-only DNS resolution, no environment proxy use, no compression, content limits, type sniffing, and hardened XML parsing;
 - conditional ETag/Last-Modified requests, parser quarantine, audit events, health/status APIs, and an optional bounded scheduler;
-- versioned migrations, including PostgreSQL immutability triggers for raw artifacts and audit events.
+- versioned migrations, including PostgreSQL immutability triggers for raw artifacts and audit events;
+- a versioned parser protocol and isolated subprocess with no inherited application secrets, an empty working directory, closed extra handles, wall-time enforcement, and bounded output;
+- source failure classification with clamped `Retry-After`, scheduled backoff, parser quarantine, permanent-failure pause, and repeated-transient-failure pause.
 
 The scheduler is disabled by default. Enabling it does not bypass source review: each source is created disabled and must pass the explicit DNS/IP validation endpoint first.
+
+The parser subprocess is a crash, timeout, handle, and environment boundary—not a complete Windows security sandbox. It can still access resources granted to the service account. Unattended hostile-input operation therefore requires a Job Object or network-disabled container plus OS egress rules.

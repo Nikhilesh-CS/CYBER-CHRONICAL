@@ -3,6 +3,7 @@ from sqlalchemy import func, select
 from cyber_chronicle.collector import SafeHttpCollector
 from cyber_chronicle.ingestion import IngestionService
 from cyber_chronicle.models import DocumentProvenance, NormalizedDocument, PipelineRun, RawArtifact, Source, SourceFetch
+from cyber_chronicle.parser_subprocess import InlineFeedParser
 
 from .fixtures import FEED_A, FEED_B, FEED_Y_REVISED, response
 
@@ -26,7 +27,7 @@ async def test_approved_source_repeated_schedule_is_idempotent(session, settings
     transport.enqueue(response(FEED_A, etag='"a"'))
     transport.enqueue(response(b"", status=304, etag='"a"'))
     transport.enqueue(response(FEED_B, etag='"b"'))
-    service = IngestionService(session, SafeHttpCollector(transport), settings)
+    service = IngestionService(session, SafeHttpCollector(transport), settings, parser=InlineFeedParser())
 
     for _ in range(4):
         run = await service.run_source(source.id, trigger_type="scheduled")
@@ -46,7 +47,7 @@ async def test_changed_item_creates_revision_and_preserves_history(session, sett
     source = add_source(session)
     transport.enqueue(response(FEED_A))
     transport.enqueue(response(FEED_Y_REVISED))
-    service = IngestionService(session, SafeHttpCollector(transport), settings)
+    service = IngestionService(session, SafeHttpCollector(transport), settings, parser=InlineFeedParser())
 
     await service.run_source(source.id)
     await service.run_source(source.id)
@@ -66,7 +67,7 @@ async def test_changed_item_creates_revision_and_preserves_history(session, sett
 async def test_parser_failure_preserves_artifact_and_quarantines_source(session, settings, transport) -> None:  # type: ignore[no-untyped-def]
     source = add_source(session)
     transport.enqueue(response(b"<?xml version='1.0'?><rss><broken>"))
-    service = IngestionService(session, SafeHttpCollector(transport), settings)
+    service = IngestionService(session, SafeHttpCollector(transport), settings, parser=InlineFeedParser())
 
     run = await service.run_source(source.id)
     session.refresh(source)

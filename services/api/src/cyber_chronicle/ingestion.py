@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .canonical import canonicalize_url, sha256_bytes, sha256_text
+from .canonical import canonicalize_url, redact_url_for_storage, sha256_bytes, sha256_text
 from .collector import CollectionError, SafeHttpCollector
 from .config import Settings
 from .models import (
@@ -19,7 +19,8 @@ from .models import (
     SourceFetch,
     new_id,
 )
-from .parser import FeedParseError, ParsedDocument, parse_feed
+from .parser import FeedParseError, ParsedDocument
+from .parser_subprocess import FeedParser, SubprocessFeedParser
 from .security import CollectorPolicyError, SourceNetworkPolicy
 
 
@@ -32,10 +33,17 @@ class SourceDisabledError(ValueError):
 
 
 class IngestionService:
-    def __init__(self, session: Session, collector: SafeHttpCollector, settings: Settings) -> None:
+    def __init__(
+        self,
+        session: Session,
+        collector: SafeHttpCollector,
+        settings: Settings,
+        parser: FeedParser | None = None,
+    ) -> None:
         self.session = session
         self.collector = collector
         self.settings = settings
+        self.parser = parser or SubprocessFeedParser.from_settings(settings)
 
     async def run_source(self, source_id: str, trigger_type: str = "manual") -> PipelineRun:
         source = self.session.get(Source, source_id)
@@ -79,10 +87,10 @@ class IngestionService:
                 conditional_headers=conditional_headers,
             )
             response = result.response
-            fetch.final_url = canonicalize_url(response.url)
+            fetch.final_url = redact_url_for_storage(response.url)
             fetch.http_status = response.status
             fetch.response_headers = response.headers
-            fetch.redirect_chain = result.redirect_chain
+            fetch.redirect_chain = [redact_url_for_storage(url) for url in result.redirect_chain]
             fetch.response_bytes = len(response.body)
 
             if response.status == 304:
@@ -92,6 +100,7 @@ class IngestionService:
                 run.finished_at = now_utc()
                 source.last_success_at = now_utc()
                 source.consecutive_failures = 0
+                source.next_attempt_at = None
                 source.etag = response.headers.get("etag") or source.etag
                 source.last_modified = response.headers.get("last-modified") or source.last_modified
                 self._audit(run, "fetch.not_modified", "source", source.id, {"status": 304})
@@ -130,7 +139,7 @@ class IngestionService:
             fetch.finished_at = now_utc()
             self.session.commit()  # Preserve the immutable response even if parsing is quarantined.
 
-            parsed = parse_feed(response.body, response.url)
+            parsed = await self.parser.parse(response.body, response.url, max_entries=self.settings.parser_max_entries)
             for document in parsed:
                 self._upsert_document(source, artifact, document, run)
 
@@ -139,32 +148,79 @@ class IngestionService:
             run.heartbeat_at = now_utc()
             source.last_success_at = now_utc()
             source.consecutive_failures = 0
+            source.next_attempt_at = None
             source.etag = response.headers.get("etag") or source.etag
             source.last_modified = response.headers.get("last-modified") or source.last_modified
             self._audit(run, "ingestion.succeeded", "source", source.id, dict(run.counters))
             self.session.commit()
             return run
         except (CollectionError, CollectorPolicyError, FeedParseError) as exc:
-            self.session.rollback()
-            run = self.session.get(PipelineRun, run.id)
-            fetch = self.session.get(SourceFetch, fetch.id)
-            source = self.session.get(Source, source.id)
-            assert run is not None and fetch is not None and source is not None
             code = getattr(exc, "code", str(exc))
-            fetch.outcome = "rejected" if isinstance(exc, CollectorPolicyError) else "failed"
-            fetch.error_code = code[:100]
-            fetch.error_detail = type(exc).__name__
-            fetch.finished_at = now_utc()
-            run.status = "failed"
-            run.error_code = code[:100]
-            run.error_detail = type(exc).__name__
-            run.finished_at = now_utc()
-            source.consecutive_failures += 1
-            if isinstance(exc, FeedParseError):
-                source.status = "parser_quarantine"
-            self._audit(run, "ingestion.failed", "source", source.id, {"error_code": code[:100]})
-            self.session.commit()
-            return run
+            outcome = "rejected" if isinstance(exc, CollectorPolicyError) else "failed"
+            return self._finalize_failure(run.id, fetch.id, source.id, exc, code, outcome)
+        except Exception as exc:
+            return self._finalize_failure(
+                run.id,
+                fetch.id,
+                source.id,
+                exc,
+                "internal_ingestion_error",
+                "failed",
+            )
+
+    def _finalize_failure(
+        self,
+        run_id: str,
+        fetch_id: str,
+        source_id: str,
+        exc: Exception,
+        code: str,
+        outcome: str,
+    ) -> PipelineRun:
+        self.session.rollback()
+        run = self.session.get(PipelineRun, run_id)
+        fetch = self.session.get(SourceFetch, fetch_id)
+        source = self.session.get(Source, source_id)
+        assert run is not None and fetch is not None and source is not None
+        if isinstance(exc, CollectionError) and exc.response is not None:
+            fetch.final_url = redact_url_for_storage(exc.response.url)
+            fetch.http_status = exc.response.status
+            fetch.response_headers = exc.response.headers
+            fetch.response_bytes = len(exc.response.body)
+            fetch.redirect_chain = [redact_url_for_storage(url) for url in exc.redirect_chain]
+        fetch.outcome = outcome
+        fetch.error_code = code[:100]
+        fetch.error_detail = type(exc).__name__
+        fetch.finished_at = now_utc()
+        run.status = "failed"
+        run.error_code = code[:100]
+        run.error_detail = type(exc).__name__
+        run.finished_at = now_utc()
+        source.consecutive_failures += 1
+        if isinstance(exc, FeedParseError):
+            source.status = "parser_quarantine"
+            source.next_attempt_at = None
+        elif isinstance(exc, CollectorPolicyError) or code in {
+            "content_encoding_forbidden",
+            "content_sniff_failed",
+            "content_type_forbidden",
+            "http_400",
+            "http_401",
+            "http_403",
+            "http_404",
+            "http_410",
+        }:
+            source.status = "paused_permanent"
+            source.next_attempt_at = None
+        else:
+            retry_seconds = self._retry_delay_seconds(source.consecutive_failures, exc)
+            source.next_attempt_at = now_utc() + timedelta(seconds=retry_seconds)
+            if source.consecutive_failures >= 6:
+                source.status = "paused_transient"
+                source.next_attempt_at = None
+        self._audit(run, "ingestion.failed", "source", source.id, {"error_code": code[:100]})
+        self.session.commit()
+        return run
 
     def _upsert_document(self, source: Source, artifact: RawArtifact, parsed: ParsedDocument, run: PipelineRun) -> None:
         existing = self.session.scalar(
@@ -229,6 +285,15 @@ class IngestionService:
                 details=details,
             )
         )
+
+    @staticmethod
+    def _retry_delay_seconds(failure_count: int, exc: Exception) -> int:
+        if isinstance(exc, CollectionError) and exc.code == "http_429" and exc.response is not None:
+            retry_after = exc.response.headers.get("retry-after", "")
+            if retry_after.isdigit():
+                return min(86_400, max(60, int(retry_after)))
+        schedule = (60, 300, 900, 3_600, 21_600, 21_600)
+        return schedule[min(max(failure_count, 1), len(schedule)) - 1]
 
     @staticmethod
     def _increment(run: PipelineRun, key: str) -> None:

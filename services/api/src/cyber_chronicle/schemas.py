@@ -54,6 +54,7 @@ class SourceRead(BaseModel):
     consecutive_failures: int
     last_attempt_at: datetime | None
     last_success_at: datetime | None
+    next_attempt_at: datetime | None
 
 
 class RunRead(BaseModel):

@@ -67,6 +67,8 @@ def upgrade() -> None:
     sa.Column('superseded_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.CheckConstraint('revision >= 1', name=op.f('ck_normalized_documents_positive_revision')),
+    sa.CheckConstraint('length(identity_hash) = 32', name=op.f('ck_normalized_documents_identity_hash_length')),
+    sa.CheckConstraint('length(content_hash) = 32', name=op.f('ck_normalized_documents_content_hash_length')),
     sa.ForeignKeyConstraint(['source_id'], ['sources.id'], name=op.f('fk_normalized_documents_source_id_sources'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_normalized_documents')),
     sa.UniqueConstraint('source_id', 'identity_hash', 'content_hash', name='document_replay_identity'),
@@ -106,6 +108,9 @@ def upgrade() -> None:
     sa.Column('first_observed_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.CheckConstraint('byte_length >= 0', name=op.f('ck_raw_artifacts_nonnegative_byte_length')),
+    sa.CheckConstraint('byte_length = length(payload)', name=op.f('ck_raw_artifacts_payload_length_matches')),
+    sa.CheckConstraint('length(sha256) = 32', name=op.f('ck_raw_artifacts_sha256_length')),
+    sa.CheckConstraint('length(canonical_url_hash) = 32', name=op.f('ck_raw_artifacts_canonical_url_hash_length')),
     sa.ForeignKeyConstraint(['source_id'], ['sources.id'], name=op.f('fk_raw_artifacts_source_id_sources'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_raw_artifacts')),
     sa.UniqueConstraint('source_id', 'canonical_url_hash', 'sha256', name='artifact_identity')

@@ -3,7 +3,7 @@ import json
 import posixpath
 import re
 import string
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 
 UNRESERVED_ESCAPE = re.compile(r"%([0-9A-Fa-f]{2})")
@@ -34,6 +34,12 @@ def canonicalize_url(url: str) -> str:
         normalized_path = "/" + normalized_path
     query = _normalize_percent_encoding(parsed.query)
     return urlunsplit((scheme, netloc, normalized_path, query, ""))
+
+
+def redact_url_for_storage(url: str) -> str:
+    parsed = urlsplit(canonicalize_url(url))
+    redacted_query = urlencode([(key, "[redacted]") for key, _value in parse_qsl(parsed.query, keep_blank_values=True)])
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, redacted_query, ""))
 
 
 def sha256_bytes(value: bytes) -> bytes:

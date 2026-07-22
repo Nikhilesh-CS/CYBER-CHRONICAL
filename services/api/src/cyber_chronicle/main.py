@@ -100,6 +100,18 @@ async def validate_and_enable_source(source_id: str, session: Session = Depends(
     return source
 
 
+@app.post("/api/v1/sources/{source_id}/disable", response_model=SourceRead)
+def disable_source(source_id: str, session: Session = Depends(get_session)) -> Source:
+    source = session.get(Source, source_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="source_not_found")
+    source.enabled = False
+    source.status = "disabled"
+    source.next_attempt_at = None
+    session.commit()
+    return source
+
+
 @app.post("/api/v1/sources/{source_id}/run", response_model=RunRead)
 async def run_source(source_id: str, session: Session = Depends(get_session)) -> PipelineRun:
     settings = get_settings()
@@ -135,6 +147,8 @@ def pipeline_status(session: Session = Depends(get_session)) -> dict:
     return {
         "sources": session.scalar(select(func.count()).select_from(Source)) or 0,
         "enabled_sources": session.scalar(select(func.count()).select_from(Source).where(Source.enabled.is_(True))) or 0,
+        "paused_sources": session.scalar(select(func.count()).select_from(Source).where(Source.status.like("paused_%"))) or 0,
+        "quarantined_sources": session.scalar(select(func.count()).select_from(Source).where(Source.status == "parser_quarantine")) or 0,
         "pipeline_runs": session.scalar(select(func.count()).select_from(PipelineRun)) or 0,
         "fetch_attempts": session.scalar(select(func.count()).select_from(SourceFetch)) or 0,
         "raw_artifacts": session.scalar(select(func.count()).select_from(RawArtifact)) or 0,
