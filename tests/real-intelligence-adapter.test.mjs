@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { gzipSync } from "node:zlib";
 import test from "node:test";
 
 const moduleUrl = new URL("../app/api/intelligence/real-data.ts", import.meta.url);
@@ -80,6 +81,25 @@ test("uses CISA's official repository mirror when the primary catalog is unavail
   assert.match(payload.sources.find((source) => source.id === "cisa-kev").retrievedFrom, /githubusercontent\.com\/cisagov\/kev-data/);
   assert.ok(requested.some((url) => url.includes("cisa.gov/sites")));
   assert.ok(requested.some((url) => url.includes("githubusercontent.com/cisagov/kev-data")));
+});
+
+test("uses NVD's official recent feed when the CVE API is unavailable", async () => {
+  const requested = [];
+  const compressed = gzipSync(JSON.stringify(nvdPayload));
+  const service = createRealIntelligenceService(async (input) => {
+    const url = String(input);
+    requested.push(url);
+    if (url.includes("cisa.gov")) return jsonResponse(kevPayload);
+    if (url.includes("services.nvd.nist.gov")) return jsonResponse({ error: "temporary" }, 503);
+    return new Response(compressed, { headers: { "content-type": "application/x-gzip" } });
+  });
+  const payload = await service(new Date("2026-07-22T12:00:00Z"));
+
+  assert.equal(payload.state, "fresh");
+  assert.equal(payload.sources.find((source) => source.id === "nvd-cves").status, "current");
+  assert.match(payload.sources.find((source) => source.id === "nvd-cves").retrievedFrom, /nvdcve-2\.0-recent\.json\.gz/);
+  assert.ok(requested.some((url) => url.includes("services.nvd.nist.gov")));
+  assert.ok(requested.some((url) => url.includes("nvd.nist.gov/feeds")));
 });
 
 test("deduplicates the same CVE in favor of CISA while preserving NVD references", async () => {

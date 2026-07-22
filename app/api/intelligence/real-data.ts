@@ -3,9 +3,11 @@ const CISA_KEV_URL =
 const CISA_KEV_MIRROR_URL =
   "https://raw.githubusercontent.com/cisagov/kev-data/develop/known_exploited_vulnerabilities.json";
 const NVD_CVE_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0";
+const NVD_RECENT_FEED_URL = "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-recent.json.gz";
 
 const FETCH_TIMEOUT_MS = 8_000;
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+const MAX_DECOMPRESSED_BYTES = 32 * 1024 * 1024;
 const FRESH_FOR_MS = 15 * 60 * 1_000;
 const STALE_FOR_MS = 6 * 60 * 60 * 1_000;
 
@@ -122,6 +124,35 @@ async function fetchJson(url: string, fetcher: typeof fetch): Promise<unknown> {
   }
 }
 
+async function fetchGzipJson(url: string, fetcher: typeof fetch): Promise<unknown> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetcher(url, {
+      headers: { accept: "application/gzip", "user-agent": "CyberChronicle/1.0" },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`Upstream returned HTTP ${response.status}`);
+    const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
+    if (!contentType.includes("gzip") && !contentType.includes("octet-stream")) {
+      throw new Error("Upstream returned a non-gzip response");
+    }
+    const declaredLength = Number(response.headers.get("content-length") ?? 0);
+    if (declaredLength > MAX_RESPONSE_BYTES) throw new Error("Upstream response is too large");
+    const compressed = await response.arrayBuffer();
+    if (compressed.byteLength > MAX_RESPONSE_BYTES) throw new Error("Upstream response is too large");
+    const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
+    const decompressed = await new Response(stream).arrayBuffer();
+    if (decompressed.byteLength > MAX_DECOMPRESSED_BYTES) throw new Error("Decompressed upstream response is too large");
+    return JSON.parse(new TextDecoder().decode(decompressed)) as unknown;
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error("Upstream request timed out");
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function parseCisaKev(payload: unknown): RealIntelligenceItem[] {
   if (!isObject(payload) || !Array.isArray(payload.vulnerabilities)) {
     throw new Error("Invalid upstream schema: CISA KEV vulnerabilities");
@@ -175,7 +206,7 @@ function parseNvd(payload: unknown): RealIntelligenceItem[] {
   if (!isObject(payload) || !Array.isArray(payload.vulnerabilities)) {
     throw new Error("Invalid upstream schema: NVD vulnerabilities");
   }
-  return payload.vulnerabilities.slice(0, 100).map((wrapper, index) => {
+  return payload.vulnerabilities.map((wrapper, index) => {
     if (!isObject(wrapper) || !isObject(wrapper.cve)) {
       throw new Error(`Invalid upstream schema: NVD item ${index}`);
     }
@@ -198,7 +229,7 @@ function parseNvd(payload: unknown): RealIntelligenceItem[] {
       affected: "See the NVD configuration data for affected products",
       references: references.length ? references : [`https://nvd.nist.gov/vuln/detail/${encodeURIComponent(id)}`],
     };
-  });
+  }).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, 100);
 }
 
 function sourceError(error: unknown): string {
@@ -257,7 +288,11 @@ export function createRealIntelligenceService(fetcher: typeof fetch = fetch) {
         parse: parseNvd,
         load: async () => {
           const url = nvdUrl(now);
-          return { payload: await fetchJson(url, fetcher), retrievedFrom: url };
+          try {
+            return { payload: await fetchJson(url, fetcher), retrievedFrom: url };
+          } catch {
+            return { payload: await fetchGzipJson(NVD_RECENT_FEED_URL, fetcher), retrievedFrom: NVD_RECENT_FEED_URL };
+          }
         },
       },
     ];

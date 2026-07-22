@@ -24,7 +24,7 @@ No candidate is enabled automatically by seeding the registry.
 The hosted vulnerability view currently reads two separate, hard-coded government data services through its server boundary:
 
 - CISA's Known Exploited Vulnerabilities JSON catalog, with the official `cisagov/kev-data` repository as a mirror fallback;
-- NIST's NVD CVE 2.0 API for recently modified records.
+- NIST's NVD CVE 2.0 API for recently modified records, with NVD's official recent bulk feed as a rate-limit/outage fallback.
 
 Responses are size- and time-bounded, schema-validated, cached for fifteen minutes, and disclosed as fresh, cached, partial, stale, or unavailable. CISA records take precedence when the same CVE appears in both sources while NVD references remain attached. This adapter does not enable the autonomous ingestion scheduler or allow user-controlled source URLs.
 
