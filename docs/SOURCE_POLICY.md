@@ -19,6 +19,15 @@ The initial disabled candidate is Google Project Zero's official Atom feed. It w
 
 No candidate is enabled automatically by seeding the registry.
 
+## Public newsroom data adapter
+
+The hosted vulnerability view currently reads two separate, hard-coded government data services through its server boundary:
+
+- CISA's Known Exploited Vulnerabilities JSON catalog, with the official `cisagov/kev-data` repository as a mirror fallback;
+- NIST's NVD CVE 2.0 API for recently modified records.
+
+Responses are size- and time-bounded, schema-validated, cached for fifteen minutes, and disclosed as fresh, cached, partial, stale, or unavailable. CISA records take precedence when the same CVE appears in both sources while NVD references remain attached. This adapter does not enable the autonomous ingestion scheduler or allow user-controlled source URLs.
+
 ## Collector rules
 
 - HTTPS only for production registry entries.

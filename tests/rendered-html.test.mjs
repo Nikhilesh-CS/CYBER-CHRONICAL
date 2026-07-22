@@ -23,10 +23,12 @@ test("server-renders the Cyber Chronicle intelligence desk", async () => {
   const html = await response.text();
   assert.match(html, /Cyber Chronicle/);
   assert.match(html, /Intelligence newsroom/);
-  assert.match(html, /Prototype intelligence/);
+  assert.match(html, /Real-source mode/);
+  assert.match(html, /No AI-generated or simulated incidents are displayed/);
   assert.match(html, /Critical Alerts/);
   assert.match(html, /Vulnerabilities/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
+  assert.doesNotMatch(html, /Helios Edge|Northstar Cloud|EmberLock|QuartzMail|Orion Systems/i);
 });
 
 test("ships product metadata and removes disposable starter assets", async () => {

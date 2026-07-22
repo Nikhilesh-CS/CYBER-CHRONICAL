@@ -34,12 +34,14 @@ Checkpoint result: deterministic repeated-run fixtures now produce separate run/
 
 ## Section 4 — Correlation and deterministic intelligence
 
-Status: planned.
+Status: deterministic core complete; pipeline integration and clustering in progress.
 
 - Parse CVE/CWE/CVSS, IP/domain/URL/hash, vendor/product/version, dates, and named entities.
 - Build exact and near-duplicate detection, event/story clustering, source-dependency graphs, and reversible merge decisions.
 
 Acceptance gate: known duplicates cluster correctly, distinct incidents remain separate, and every extracted observable traces to an evidence passage.
+
+Checkpoint result: IOC/entity extraction now supports URLs, domains, email addresses, IP addresses, hashes, CVEs, and CWEs with exact source-field offsets. Exact fingerprints and explainable near-duplicate scores are covered by deterministic tests. These primitives are not yet wired into persisted ingestion jobs or reversible multi-document story clusters, so the section remains open.
 
 ## Section 5 — Verification and publishing
 
