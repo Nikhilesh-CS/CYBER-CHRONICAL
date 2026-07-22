@@ -11,15 +11,15 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const base = new URL(`${protocol}://${host}`);
-  const title = "Cyber Chronicle | Autonomous cyber intelligence";
-  const description = "A laptop-first autonomous cybersecurity newsroom for verified, actionable threat intelligence.";
+  const title = "Cyber Chronicle India | CERT-In intelligence desk";
+  const description = "An India-only cybersecurity intelligence desk for current CERT-In advisories and vulnerability notes.";
 
   return {
     metadataBase: base,
     title,
     description,
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
-    openGraph: { title, description, type: "website", images: [{ url: new URL("/og.png", base).toString(), width: 1728, height: 911, alt: "Cyber Chronicle verified cyber intelligence" }] },
+    openGraph: { title, description, type: "website", images: [{ url: new URL("/og.png", base).toString(), width: 1728, height: 911, alt: "Cyber Chronicle India cybersecurity intelligence" }] },
     twitter: { card: "summary_large_image", title, description, images: [new URL("/og.png", base).toString()] },
   };
 }
