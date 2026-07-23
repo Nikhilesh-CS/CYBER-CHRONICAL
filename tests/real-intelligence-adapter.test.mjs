@@ -77,11 +77,39 @@ test("uses the short-lived cache without another network request", async () => {
     return htmlResponse(String(input).includes("VLNLIST02") ? vulnerabilityHtml : advisoryHtml);
   });
   await service(new Date("2026-07-22T12:00:00Z"));
-  const cached = await service(new Date("2026-07-22T12:05:00Z"));
+  const cached = await service(new Date("2026-07-22T12:04:00Z"));
 
   assert.equal(cached.state, "cached");
-  assert.equal(cached.cacheAgeSeconds, 300);
+  assert.equal(cached.cacheAgeSeconds, 240);
   assert.equal(calls, 2);
+});
+
+test("manual refresh bypasses the short-lived source cache", async () => {
+  let calls = 0;
+  const service = createRealIntelligenceService(async (input) => {
+    calls += 1;
+    return htmlResponse(String(input).includes("VLNLIST02") ? vulnerabilityHtml : advisoryHtml);
+  });
+  await service(new Date("2026-07-22T12:00:00Z"));
+  const refreshed = await service(new Date("2026-07-22T12:01:00Z"), { force: true });
+
+  assert.equal(refreshed.state, "fresh");
+  assert.equal(refreshed.generatedAt, "2026-07-22T12:01:00.000Z");
+  assert.equal(calls, 4);
+});
+
+test("fails visibly when a newly listed CERT-In record has incomplete metadata", async () => {
+  const incomplete = advisoryHtml.replace(
+    '<a href="/s2cMainServlet?pageid=PUBVLNOTES02&VLCODE=CIAD-2026-0036">',
+    '<a href="/s2cMainServlet?pageid=PUBVLNOTES02&VLCODE=CIAD-2026-0037"></a><a href="/s2cMainServlet?pageid=PUBVLNOTES02&VLCODE=CIAD-2026-0036">',
+  );
+  const service = createRealIntelligenceService(async (input) =>
+    htmlResponse(String(input).includes("VLNLIST02") ? vulnerabilityHtml : incomplete));
+  const payload = await service(new Date("2026-07-22T12:00:00Z"));
+
+  assert.equal(payload.state, "partial");
+  assert.equal(payload.sources.find((source) => source.id === "cert-in-advisories").status, "failed");
+  assert.ok(payload.items.every((item) => item.source === "CERT-In Vulnerability Note"));
 });
 
 test("reports partial data and never invents a failed source record", async () => {

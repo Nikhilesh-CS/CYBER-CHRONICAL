@@ -37,16 +37,24 @@ test("server-renders the Cyber Chronicle intelligence desk", async () => {
 });
 
 test("ships product metadata and removes disposable starter assets", async () => {
-  const [layout, page, packageJson] = await Promise.all([
+  const [layout, page, packageJson, manifest, serviceWorker] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
+    readFile(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"),
+    readFile(new URL("../public/service-worker.js", import.meta.url), "utf8"),
   ]);
 
   assert.match(layout, /Cyber Chronicle India \| CERT-In intelligence desk/);
   assert.match(layout, /\/og\.png/);
+  assert.match(layout, /\/manifest\.webmanifest/);
   assert.match(page, /CyberChronicleApp/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
+  assert.equal(JSON.parse(manifest).display, "standalone");
+  assert.match(serviceWorker, /request\.mode === "navigate"/);
+  assert.match(serviceWorker, /url\.pathname\.startsWith\("\/api\/"\)/);
   await access(new URL("../public/og.png", import.meta.url));
+  await access(new URL("../public/app-icon-192.png", import.meta.url));
+  await access(new URL("../public/app-icon-512.png", import.meta.url));
   await assert.rejects(access(new URL("../app/_sites-preview/SkeletonPreview.tsx", root)));
 });

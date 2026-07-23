@@ -1,0 +1,26 @@
+{
+  "name": "Cyber Chronicle India",
+  "short_name": "Cyber Chronicle",
+  "description": "Laptop-ready India cybersecurity intelligence desk using official CERT-In records.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#080d13",
+  "theme_color": "#0d171f",
+  "orientation": "any",
+  "categories": ["security", "news", "productivity"],
+  "icons": [
+    {
+      "src": "/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

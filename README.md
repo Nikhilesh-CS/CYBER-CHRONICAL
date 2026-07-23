@@ -2,6 +2,12 @@
 
 Cyber Chronicle is a laptop-first, India-only cybersecurity intelligence desk. The hosted newsroom currently displays official CERT-In advisory metadata without inventing missing details or relying on non-Indian feeds.
 
+## Laptop app
+
+The deployed desk is an installable Progressive Web App for Windows, macOS, Linux, and ChromeOS. In a supported desktop browser, use **Install app** in the command bar (or the browser's install icon) to open Cyber Chronicle in its own application window.
+
+The app checks for new records every five minutes while open, refreshes when the laptop reconnects or regains focus, and provides **Refresh now** to bypass the short-lived source cache. Its service worker does not cache page navigation or API responses, so an installed copy cannot pin old intelligence.
+
 ## Current milestone
 
 - Live CERT-In Advisories and Vulnerability Notes

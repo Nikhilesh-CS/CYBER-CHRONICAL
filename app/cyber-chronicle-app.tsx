@@ -3,13 +3,17 @@
 import {
   Activity, AlertTriangle, Bell, Bookmark, BookmarkCheck, ChevronRight,
   CircleAlert, Clock3, ExternalLink, FileText, Filter, Gauge, LayoutDashboard,
-  Menu, Radar, Search, Settings, ShieldCheck, Siren, TrendingUp, X,
+  Download, Menu, Radar, RefreshCw, Search, Settings, ShieldCheck, Siren, TrendingUp, X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RealIntelligenceItem, RealIntelligenceResponse } from "./api/intelligence/real-data";
 
 type View = "Newsroom" | "Live Feed" | "India Advisories" | "Security Records" | "Saved" | "Settings";
 type SourceFilter = "All" | RealIntelligenceItem["source"];
+type InstallPrompt = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
 
 const CERT_IN_ADVISORIES = "https://www.cert-in.org.in/s2cMainServlet?pageid=PUBADVLIST02";
 const EMPTY_RESPONSE: RealIntelligenceResponse = {
@@ -68,22 +72,62 @@ export function CyberChronicleApp({ initialData = EMPTY_RESPONSE }: { initialDat
   const [selected, setSelected] = useState<RealIntelligenceItem | null>(null);
   const [saved, setSaved] = useState<string[]>([]);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
+
+  const refresh = useCallback(async (force = false) => {
+    setIsRefreshing(true);
+    setRefreshError(null);
+    try {
+      const suffix = force ? `?refresh=1&t=${Date.now()}` : `?t=${Date.now()}`;
+      const response = await fetch(`/api/intelligence${suffix}`, {
+        cache: "no-store",
+        headers: { accept: "application/json" },
+      });
+      const payload = await response.json() as RealIntelligenceResponse;
+      if (!payload || !Array.isArray(payload.items)) throw new Error("Invalid source response");
+      setData(payload);
+      if (!response.ok) setRefreshError(payload.notice);
+    } catch {
+      setRefreshError("Refresh failed. Showing the last verified records.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("cyber-chronicle-saved");
     const restoreTimer = window.setTimeout(() => {
       if (stored) { try { setSaved(JSON.parse(stored)); } catch { setSaved([]); } }
     }, 0);
-    const refresh = async () => {
-      try {
-        const response = await fetch("/api/intelligence", { headers: { accept: "application/json" } });
-        const payload = await response.json() as RealIntelligenceResponse;
-        if (payload && Array.isArray(payload.items)) setData(payload);
-      } catch { /* The rendered source status remains visible. */ }
+    const timer = window.setInterval(() => void refresh(), 5 * 60_000);
+    const resumeRefresh = () => void refresh();
+    window.addEventListener("focus", resumeRefresh);
+    window.addEventListener("online", resumeRefresh);
+    return () => {
+      window.clearTimeout(restoreTimer);
+      window.clearInterval(timer);
+      window.removeEventListener("focus", resumeRefresh);
+      window.removeEventListener("online", resumeRefresh);
     };
-    void refresh();
-    const timer = window.setInterval(refresh, 5 * 60_000);
-    return () => { window.clearTimeout(restoreTimer); window.clearInterval(timer); };
+  }, [refresh]);
+
+  useEffect(() => {
+    if ("serviceWorker" in navigator) {
+      void navigator.serviceWorker.register("/service-worker.js", { updateViaCache: "none" });
+    }
+    const onInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as InstallPrompt);
+    };
+    const onInstalled = () => setInstallPrompt(null);
+    window.addEventListener("beforeinstallprompt", onInstallPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onInstallPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
   }, []);
 
   useEffect(() => {
@@ -108,6 +152,12 @@ export function CyberChronicleApp({ initialData = EMPTY_RESPONSE }: { initialDat
     window.localStorage.setItem("cyber-chronicle-saved", JSON.stringify(next)); return next;
   });
   const currentSources = data.sources.filter((source) => source.status === "current").length;
+  const installApp = async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    await installPrompt.userChoice;
+    setInstallPrompt(null);
+  };
 
   return <div className={`app-shell ${navOpen ? "" : "nav-collapsed"}`}>
     <aside className="sidebar">
@@ -117,8 +167,8 @@ export function CyberChronicleApp({ initialData = EMPTY_RESPONSE }: { initialDat
       <button className="collapse-button" onClick={() => setNavOpen((value) => !value)}><Menu size={17} /><span>Collapse navigation</span></button>
     </aside>
 
-    <main><header className="command-bar"><div className="search-wrap"><Search size={17} /><input id="global-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search CERT-In IDs, advisories and products…" aria-label="Search intelligence" /><kbd>/</kbd></div><div className="freshness"><span className="live-dot" />{data.lastSuccessfulAt ? `Retrieved ${ageLabel(data.lastSuccessfulAt)}` : "Awaiting CERT-In"}</div><button className="icon-button notification-button" aria-label="Notifications" onClick={() => setNotificationsOpen((value) => !value)}><Bell size={19} /><span>{Math.min(alerts.length, 99)}</span></button><div className="avatar">IN</div>{notificationsOpen && <div className="notification-popover"><div><strong>Latest India advisories</strong><button className="icon-button" onClick={() => setNotificationsOpen(false)}><X size={16} /></button></div>{alerts.slice(0, 3).map((item) => <p key={item.id}><b>CERT-In</b>{item.identifier} · {item.title.replace(`${item.identifier}: `, "")}</p>)}</div>}</header>
-      <div className={`demo-banner source-state-${data.state}`}><ShieldCheck size={14} /><strong>India-only mode:</strong>{data.notice} No non-Indian sources or simulated incidents are displayed.</div>
+    <main><header className="command-bar"><div className="search-wrap"><Search size={17} /><input id="global-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search CERT-In IDs, advisories and products…" aria-label="Search intelligence" /><kbd>/</kbd></div><div className="freshness"><span className="live-dot" />{data.lastSuccessfulAt ? `Retrieved ${ageLabel(data.lastSuccessfulAt)}` : "Awaiting CERT-In"}</div><div className="desktop-actions">{installPrompt && <button className="command-action install-action" onClick={() => void installApp()}><Download size={15} /><span>Install app</span></button>}<button className="command-action" onClick={() => void refresh(true)} disabled={isRefreshing} aria-label="Refresh directly from CERT-In"><RefreshCw className={isRefreshing ? "spin" : ""} size={15} /><span>{isRefreshing ? "Checking…" : "Refresh now"}</span></button></div><button className="icon-button notification-button" aria-label="Notifications" onClick={() => setNotificationsOpen((value) => !value)}><Bell size={19} /><span>{Math.min(alerts.length, 99)}</span></button><div className="avatar">IN</div>{notificationsOpen && <div className="notification-popover"><div><strong>Latest India advisories</strong><button className="icon-button" onClick={() => setNotificationsOpen(false)}><X size={16} /></button></div>{alerts.slice(0, 3).map((item) => <p key={item.id}><b>CERT-In</b>{item.identifier} · {item.title.replace(`${item.identifier}: `, "")}</p>)}</div>}</header>
+      <div className={`demo-banner source-state-${refreshError ? "stale" : data.state}`}><ShieldCheck size={14} /><strong>India-only mode:</strong>{refreshError ?? data.notice} No non-Indian sources or simulated incidents are displayed.</div>
       {view === "Newsroom" && <Newsroom items={visible} sourceFilter={sourceFilter} setSourceFilter={setSourceFilter} saved={saved} onSave={toggleSaved} onOpen={setSelected} data={data} />}
       {view === "Live Feed" && <LiveFeed items={visible} onOpen={setSelected} />}
       {view === "India Advisories" && <Alerts items={alerts} onOpen={setSelected} />}

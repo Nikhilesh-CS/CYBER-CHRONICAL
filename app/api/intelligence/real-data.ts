@@ -1,8 +1,8 @@
 const CERT_IN_ORIGIN = "https://www.cert-in.org.in";
 
-const FETCH_TIMEOUT_MS = 8_000;
+const FETCH_TIMEOUT_MS = 12_000;
 const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
-const FRESH_FOR_MS = 15 * 60 * 1_000;
+const FRESH_FOR_MS = 5 * 60 * 1_000;
 const STALE_FOR_MS = 6 * 60 * 60 * 1_000;
 const MAX_ITEMS_PER_SOURCE = 100;
 
@@ -146,18 +146,24 @@ function parseCertInIndex(html: string, definition: CertInDefinition): RealIntel
     throw new Error("Invalid upstream schema: CERT-In authority markers");
   }
 
-  const escapedPrefix = definition.identifierPrefix;
-  const recordPattern = new RegExp(
-    `VLCODE=(${escapedPrefix}-\\d{4}-\\d{4})[\\s\\S]{0,900}?\\(([A-Za-z]+\\s+\\d{1,2},\\s+\\d{4})\\)[\\s\\S]{0,700}?padding-left:\\s*(?:15|20)px[^>]*>([\\s\\S]*?)<\\/span>`,
-    "gi",
-  );
+  const anchorPattern = new RegExp(`VLCODE=(${definition.identifierPrefix}-\\d{4}-\\d{4})`, "gi");
+  const anchors = [...html.matchAll(anchorPattern)];
   const items: RealIntelligenceItem[] = [];
   const seen = new Set<string>();
-  for (const match of html.matchAll(recordPattern)) {
+  for (let index = 0; index < anchors.length; index += 1) {
+    const match = anchors[index];
     const identifier = match[1].toUpperCase();
     if (seen.has(identifier)) continue;
-    const publishedAt = parseCertInDate(match[2]);
-    const title = decodeHtml(match[3]);
+    const start = match.index ?? 0;
+    const end = Math.min(anchors[index + 1]?.index ?? html.length, start + 8_000);
+    const record = html.slice(start, end);
+    const dateMatch = /\(([A-Za-z]+\s+\d{1,2},\s+\d{4})\)/i.exec(record);
+    const titleMatch = /padding-left:\s*\d+px[^>]*>([\s\S]*?)<\/span>/i.exec(record);
+    if (!dateMatch || !titleMatch) {
+      throw new Error(`Invalid upstream schema: incomplete ${identifier} metadata`);
+    }
+    const publishedAt = parseCertInDate(dateMatch[1]);
+    const title = decodeHtml(titleMatch[1]);
     if (!title) throw new Error(`Invalid upstream schema: ${identifier} title`);
     const reference = `${CERT_IN_ORIGIN}/s2cMainServlet?pageid=${definition.detailPageId}&VLCODE=${encodeURIComponent(identifier)}`;
     items.push({
@@ -175,7 +181,9 @@ function parseCertInIndex(html: string, definition: CertInDefinition): RealIntel
     seen.add(identifier);
     if (items.length >= MAX_ITEMS_PER_SOURCE) break;
   }
-  if (items.length === 0) throw new Error(`Invalid upstream schema: no ${definition.identifierPrefix} records`);
+  if (anchors.length === 0 || items.length === 0) {
+    throw new Error(`Invalid upstream schema: no ${definition.identifierPrefix} records`);
+  }
   return items;
 }
 
@@ -269,8 +277,8 @@ export function createRealIntelligenceService(fetcher: typeof fetch = fetch) {
     };
   }
 
-  return async function getRealIntelligence(now = new Date()): Promise<RealIntelligenceResponse> {
-    if (snapshot && now.getTime() - snapshot.storedAt < FRESH_FOR_MS) {
+  return async function getRealIntelligence(now = new Date(), options: { force?: boolean } = {}): Promise<RealIntelligenceResponse> {
+    if (!options.force && snapshot && now.getTime() - snapshot.storedAt < FRESH_FOR_MS) {
       return {
         ...snapshotPayload(snapshot),
         state: "cached",
