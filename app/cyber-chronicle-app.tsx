@@ -14,6 +14,11 @@ type InstallPrompt = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
+type RefreshFeedback = {
+  kind: "checking" | "updated" | "unchanged" | "error";
+  title: string;
+  message: string;
+};
 
 const CERT_IN_ADVISORIES = "https://www.cert-in.org.in/s2cMainServlet?pageid=PUBADVLIST02";
 const EMPTY_RESPONSE: RealIntelligenceResponse = {
@@ -44,7 +49,29 @@ function ageLabel(value: string) {
 }
 
 function evidenceLabel(item: RealIntelligenceItem) {
-  return item.source === "CERT-In Advisory" ? "Official advisory" : "Vulnerability note";
+  return item.source === "CERT-In Advisory" ? "Security alert" : "Security note";
+}
+
+function plainTitle(item: RealIntelligenceItem) {
+  return item.title.replace(`${item.identifier}: `, "");
+}
+
+function studentExplanation(item: RealIntelligenceItem) {
+  const title = plainTitle(item);
+  const multiple = /^Multiple Vulnerabilities in (.+)$/i.exec(title);
+  if (multiple) {
+    return `CERT-In has warned that ${multiple[1]} may contain several security weaknesses. The official notice explains which versions are affected.`;
+  }
+  const single = /^(?:A )?Vulnerability in (.+)$/i.exec(title);
+  if (single) {
+    return `CERT-In has warned about a security weakness in ${single[1]}. The official notice explains which versions are affected.`;
+  }
+  return `CERT-In has published an official security notice about ${title}. Open the official page to see the affected versions and safety instructions.`;
+}
+
+function studentAction(item: RealIntelligenceItem) {
+  const subject = plainTitle(item).replace(/^Multiple Vulnerabilities in |^(?:A )?Vulnerability in /i, "");
+  return `If you use ${subject}, do not panic. Check the official notice and ask your teacher, lab administrator, or IT team whether your version needs an update.`;
 }
 
 function SeverityPill({ item }: { item: RealIntelligenceItem }) {
@@ -58,7 +85,7 @@ function SourcePill({ item }: { item: RealIntelligenceItem }) {
 function StoryCard({ item, onOpen, saved, onSave }: { item: RealIntelligenceItem; onOpen: () => void; saved: boolean; onSave: () => void }) {
   return <article className="story-card" onClick={onOpen} tabIndex={0} onKeyDown={(event) => event.key === "Enter" && onOpen()}>
     <div className="story-card-top"><span className="eyebrow">{item.source} · {item.identifier}</span><button className="icon-button save-button" aria-label={saved ? "Remove saved record" : "Save record"} onClick={(event) => { event.stopPropagation(); onSave(); }}>{saved ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}</button></div>
-    <h3>{item.title}</h3><p>{item.summary}</p>
+    <h3>{plainTitle(item)}</h3><p>{studentExplanation(item)}</p>
     <div className="story-meta"><SeverityPill item={item} /><span>{item.affected}</span><span>{ageLabel(item.updatedAt)}</span></div>
   </article>;
 }
@@ -74,11 +101,19 @@ export function CyberChronicleApp({ initialData = EMPTY_RESPONSE }: { initialDat
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [refreshFeedback, setRefreshFeedback] = useState<RefreshFeedback | null>(null);
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
 
   const refresh = useCallback(async (force = false) => {
     setIsRefreshing(true);
     setRefreshError(null);
+    if (force) {
+      setRefreshFeedback({
+        kind: "checking",
+        title: "Checking CERT-In now",
+        message: "Looking for records that are newer than the ones currently shown.",
+      });
+    }
     try {
       const suffix = force ? `?refresh=1&t=${Date.now()}` : `?t=${Date.now()}`;
       const response = await fetch(`/api/intelligence${suffix}`, {
@@ -87,14 +122,35 @@ export function CyberChronicleApp({ initialData = EMPTY_RESPONSE }: { initialDat
       });
       const payload = await response.json() as RealIntelligenceResponse;
       if (!payload || !Array.isArray(payload.items)) throw new Error("Invalid source response");
+      if (!response.ok && payload.items.length === 0) throw new Error(payload.notice);
+      const previousIds = new Set(data.items.map((item) => item.id));
+      const newItems = payload.items.filter((item) => !previousIds.has(item.id));
       setData(payload);
       if (!response.ok) setRefreshError(payload.notice);
+      if (force) {
+        const latest = payload.items[0];
+        setRefreshFeedback(newItems.length > 0 ? {
+          kind: "updated",
+          title: `${newItems.length} new ${newItems.length === 1 ? "record" : "records"} loaded`,
+          message: latest
+            ? `Checked ${dateLabel(payload.generatedAt, true)} IST. The newest is ${latest.identifier}, published ${dateLabel(latest.publishedAt)}.`
+            : `Checked ${dateLabel(payload.generatedAt, true)} IST. The dashboard now shows the newest official records.`,
+        } : {
+          kind: "unchanged",
+          title: "You are already up to date",
+          message: latest
+            ? `Checked CERT-In ${dateLabel(payload.generatedAt, true)} IST. No newer record was found. The latest remains ${latest.identifier}, published ${dateLabel(latest.publishedAt)}.`
+            : `Checked CERT-In ${dateLabel(payload.generatedAt, true)} IST. No new record was found.`,
+        });
+      }
     } catch {
-      setRefreshError("Refresh failed. Showing the last verified records.");
+      const message = "CERT-In could not be checked right now. The last verified records are still shown.";
+      setRefreshError(message);
+      if (force) setRefreshFeedback({ kind: "error", title: "Update check could not finish", message });
     } finally {
       setIsRefreshing(false);
     }
-  }, []);
+  }, [data.items]);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("cyber-chronicle-saved");
@@ -167,8 +223,9 @@ export function CyberChronicleApp({ initialData = EMPTY_RESPONSE }: { initialDat
       <button className="collapse-button" onClick={() => setNavOpen((value) => !value)}><Menu size={17} /><span>Collapse navigation</span></button>
     </aside>
 
-    <main><header className="command-bar"><div className="search-wrap"><Search size={17} /><input id="global-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search CERT-In IDs, advisories and products…" aria-label="Search intelligence" /><kbd>/</kbd></div><div className="freshness"><span className="live-dot" />{data.lastSuccessfulAt ? `Retrieved ${ageLabel(data.lastSuccessfulAt)}` : "Awaiting CERT-In"}</div><div className="desktop-actions">{installPrompt && <button className="command-action install-action" onClick={() => void installApp()}><Download size={15} /><span>Install app</span></button>}<button className="command-action" onClick={() => void refresh(true)} disabled={isRefreshing} aria-label="Refresh directly from CERT-In"><RefreshCw className={isRefreshing ? "spin" : ""} size={15} /><span>{isRefreshing ? "Checking…" : "Refresh now"}</span></button></div><button className="icon-button notification-button" aria-label="Notifications" onClick={() => setNotificationsOpen((value) => !value)}><Bell size={19} /><span>{Math.min(alerts.length, 99)}</span></button><div className="avatar">IN</div>{notificationsOpen && <div className="notification-popover"><div><strong>Latest India advisories</strong><button className="icon-button" onClick={() => setNotificationsOpen(false)}><X size={16} /></button></div>{alerts.slice(0, 3).map((item) => <p key={item.id}><b>CERT-In</b>{item.identifier} · {item.title.replace(`${item.identifier}: `, "")}</p>)}</div>}</header>
+    <main><header className="command-bar"><div className="search-wrap"><Search size={17} /><input id="global-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by product or CERT-In number…" aria-label="Search intelligence" /><kbd>/</kbd></div><div className="freshness"><span className="live-dot" />{data.lastSuccessfulAt ? `Checked ${ageLabel(data.lastSuccessfulAt)}` : "Awaiting CERT-In"}</div><div className="desktop-actions">{installPrompt && <button className="command-action install-action" onClick={() => void installApp()}><Download size={15} /><span>Install app</span></button>}<button className="command-action refresh-action" onClick={() => void refresh(true)} disabled={isRefreshing} aria-label="Check CERT-In for new records" title="Check CERT-In for new records"><RefreshCw className={isRefreshing ? "spin" : ""} size={15} /><span>{isRefreshing ? "Checking…" : "Check for updates"}</span></button></div><button className="icon-button notification-button" aria-label="Notifications" onClick={() => setNotificationsOpen((value) => !value)}><Bell size={19} /><span>{Math.min(alerts.length, 99)}</span></button><div className="avatar">IN</div>{notificationsOpen && <div className="notification-popover"><div><strong>Latest India advisories</strong><button className="icon-button" onClick={() => setNotificationsOpen(false)}><X size={16} /></button></div>{alerts.slice(0, 3).map((item) => <p key={item.id}><b>CERT-In</b>{item.identifier} · {plainTitle(item)}</p>)}</div>}</header>
       <div className={`demo-banner source-state-${refreshError ? "stale" : data.state}`}><ShieldCheck size={14} /><strong>India-only mode:</strong>{refreshError ?? data.notice} No non-Indian sources or simulated incidents are displayed.</div>
+      {refreshFeedback && <div className={`refresh-feedback refresh-${refreshFeedback.kind}`} role="status" aria-live="polite"><RefreshCw className={refreshFeedback.kind === "checking" ? "spin" : ""} size={17} /><div><strong>{refreshFeedback.title}</strong><span>{refreshFeedback.message}</span></div>{refreshFeedback.kind !== "checking" && <button onClick={() => setRefreshFeedback(null)} aria-label="Dismiss update result"><X size={15} /></button>}</div>}
       {view === "Newsroom" && <Newsroom items={visible} sourceFilter={sourceFilter} setSourceFilter={setSourceFilter} saved={saved} onSave={toggleSaved} onOpen={setSelected} data={data} />}
       {view === "Live Feed" && <LiveFeed items={visible} onOpen={setSelected} />}
       {view === "India Advisories" && <Alerts items={alerts} onOpen={setSelected} />}
@@ -184,10 +241,10 @@ function PageHeading({ title, eyebrow, children }: { title: string; eyebrow: str
 
 function Newsroom({ items, sourceFilter, setSourceFilter, saved, onSave, onOpen, data }: { items: RealIntelligenceItem[]; sourceFilter: SourceFilter; setSourceFilter: (value: SourceFilter) => void; saved: string[]; onSave: (id: string) => void; onOpen: (item: RealIntelligenceItem) => void; data: RealIntelligenceResponse }) {
   const lead = items[0];
-  if (!lead) return <div className="page single-page"><PageHeading eyebrow="India source monitor" title="India intelligence newsroom" /><Unavailable notice={data.notice} /></div>;
-  return <div className="page newsroom-page"><PageHeading eyebrow={data.generatedAt ? `Retrieved ${dateLabel(data.generatedAt, true)} IST` : "India source monitor"} title="India intelligence newsroom"><a className="brief-button" href={CERT_IN_ADVISORIES} target="_blank" rel="noreferrer"><FileText size={16} />Open CERT-In<ExternalLink size={13} /></a></PageHeading>
-    <div className="newsroom-grid"><section className="lead-story" onClick={() => onOpen(lead)}><div className="lead-pattern" /><div className="lead-content"><div className="breaking-line"><span>Latest official India record</span><span>{lead.source}</span></div><div className="lead-pills"><SeverityPill item={lead} /><SourcePill item={lead} /></div><h2>{lead.title}</h2><p>{lead.summary}</p><div className="lead-footer"><span><Clock3 size={14} />Published {dateLabel(lead.publishedAt)}</span><span>{lead.identifier}</span><button>Open record <ChevronRight size={16} /></button></div></div></section>
-      <aside className="alert-stack"><div className="section-title"><span>Latest CERT-In advisories</span><a href={CERT_IN_ADVISORIES} target="_blank" rel="noreferrer">Official source</a></div>{items.filter((item) => item.source === "CERT-In Advisory").slice(0, 3).map((item, index) => <button className="mini-alert" key={item.id} onClick={() => onOpen(item)}><span className={`alert-index ${index === 0 ? "hot" : ""}`}>0{index + 1}</span><div><SeverityPill item={item} /><strong>{item.title}</strong><span>{item.identifier} · {dateLabel(item.publishedAt)}</span></div><ChevronRight size={16} /></button>)}</aside></div>
+  if (!lead) return <div className="page single-page"><PageHeading eyebrow="India source monitor" title="India cyber news for students" /><Unavailable notice={data.notice} /></div>;
+  return <div className="page newsroom-page"><PageHeading eyebrow={data.generatedAt ? `Last checked ${dateLabel(data.generatedAt, true)} IST` : "India source monitor"} title="India cyber news, explained simply"><a className="brief-button" href={CERT_IN_ADVISORIES} target="_blank" rel="noreferrer"><FileText size={16} />Open CERT-In<ExternalLink size={13} /></a></PageHeading>
+    <div className="newsroom-grid"><section className="lead-story" onClick={() => onOpen(lead)}><div className="lead-pattern" /><div className="lead-content"><div className="breaking-line"><span>Newest CERT-In update</span><span>{lead.source}</span></div><div className="lead-pills"><SeverityPill item={lead} /><SourcePill item={lead} /></div><h2>{plainTitle(lead)}</h2><div className="student-explanation"><span>In simple words</span><p>{studentExplanation(lead)}</p><small>{studentAction(lead)}</small></div><div className="lead-footer"><span><Clock3 size={14} />Published {dateLabel(lead.publishedAt)}</span><span>{lead.identifier}</span><button>Learn more <ChevronRight size={16} /></button></div></div></section>
+      <aside className="alert-stack"><div className="section-title"><span>Newest security alerts</span><a href={CERT_IN_ADVISORIES} target="_blank" rel="noreferrer">View on CERT-In</a></div>{items.filter((item) => item.source === "CERT-In Advisory").slice(0, 3).map((item, index) => <button className="mini-alert" key={item.id} onClick={() => onOpen(item)}><span className={`alert-index ${index === 0 ? "hot" : ""}`}>0{index + 1}</span><div><SeverityPill item={item} /><strong>{plainTitle(item)}</strong><span>{item.identifier} · {dateLabel(item.publishedAt)}</span></div><ChevronRight size={16} /></button>)}</aside></div>
     <section className="content-section"><div className="section-title"><div><span>Latest CERT-In records</span><small>{items.length} records match this view</small></div><div className="filter-row"><Filter size={15} /><select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as SourceFilter)} aria-label="Filter by CERT-In record type"><option>All</option><option>CERT-In Advisory</option><option>CERT-In Vulnerability Note</option></select></div></div><div className="story-grid">{items.slice(1, 13).map((item) => <StoryCard key={item.id} item={item} saved={saved.includes(item.id)} onSave={() => onSave(item.id)} onOpen={() => onOpen(item)} />)}</div></section>
     <IntelligenceRail items={items} data={data} />
   </div>;
@@ -199,7 +256,7 @@ function IntelligenceRail({ items, data }: { items: RealIntelligenceItem[]; data
   return <aside className="intel-rail"><section><div className="section-title"><span>India source status</span><ShieldCheck size={16} /></div>{data.sources.map((source) => <div className="trend-row" key={source.id}><b>{source.status === "current" ? "OK" : "—"}</b><span>{source.name}</span><em>{source.itemCount}</em></div>)}</section><section><div className="section-title"><span>Record coverage</span><TrendingUp size={16} /></div><div className="trend-row"><b>01</b><span>Advisories</span><em>{advisoryCount}</em></div><div className="trend-row"><b>02</b><span>Vulnerability notes</span><em>{noteCount}</em></div></section><section className="brief-card"><span><ShieldCheck size={15} />INDIA SOURCE SUMMARY</span><p>{items.length} recent metadata records are loaded directly from CERT-In. Open the official record for severity, affected systems and remediation.</p><a href={CERT_IN_ADVISORIES} target="_blank" rel="noreferrer">Verify at CERT-In <ChevronRight size={14} /></a></section></aside>;
 }
 
-function LiveFeed({ items, onOpen }: { items: RealIntelligenceItem[]; onOpen: (item: RealIntelligenceItem) => void }) { return <div className="page single-page"><PageHeading eyebrow="Official Indian cyber records" title="CERT-In live feed"><span className="stream-status"><span className="live-dot" />Auto-refreshing</span></PageHeading><div className="feed-controls"><div className="feed-filters"><button className="active">All CERT-In records</button></div><span className="outline-button"><Gauge size={16} />Publication dates shown</span></div><section className="feed-list">{items.slice(0, 100).map((item) => <button className="feed-event" key={item.id} onClick={() => onOpen(item)}><span className="feed-time">{dateLabel(item.updatedAt)}<i /></span><div className="feed-body"><div><span className="eyebrow">{item.source}</span><span className="state state-verified">Official India record</span></div><h3>{item.title}</h3><p>{item.summary}</p><div className="story-meta"><SeverityPill item={item} /><span>{item.identifier}</span><span>CERT-In</span></div></div><ChevronRight size={17} /></button>)}</section></div>; }
+function LiveFeed({ items, onOpen }: { items: RealIntelligenceItem[]; onOpen: (item: RealIntelligenceItem) => void }) { return <div className="page single-page"><PageHeading eyebrow="Official Indian cyber records" title="Latest security updates"><span className="stream-status"><span className="live-dot" />Checks every 5 minutes</span></PageHeading><div className="feed-controls"><div className="feed-filters"><button className="active">All CERT-In records</button></div><span className="outline-button"><Gauge size={16} />Newest first</span></div><section className="feed-list">{items.slice(0, 100).map((item) => <button className="feed-event" key={item.id} onClick={() => onOpen(item)}><span className="feed-time">{dateLabel(item.updatedAt)}<i /></span><div className="feed-body"><div><span className="eyebrow">{item.source}</span><span className="state state-verified">Official India record</span></div><h3>{plainTitle(item)}</h3><p>{studentExplanation(item)}</p><div className="story-meta"><SeverityPill item={item} /><span>{item.identifier}</span><span>CERT-In</span></div></div><ChevronRight size={17} /></button>)}</section></div>; }
 
 function Alerts({ items, onOpen }: { items: RealIntelligenceItem[]; onOpen: (item: RealIntelligenceItem) => void }) {
   const latestDate = items[0]?.publishedAt;
@@ -220,7 +277,7 @@ function SavedView({ items, saved, onSave, onOpen }: { items: RealIntelligenceIt
 function SettingsView({ data }: { data: RealIntelligenceResponse }) { return <div className="page single-page"><PageHeading eyebrow="Transparency" title="India sources & methodology" /><div className="settings-grid"><section><h3>Current India sources</h3>{data.sources.map((source) => <a className="setting-row" href={source.url} target="_blank" rel="noreferrer" key={source.id}><div><strong>{source.name}</strong><span>{source.authority} · {source.status} · {source.itemCount} records</span></div><ExternalLink size={16} /></a>)}</section><section><h3>What Cyber Chronicle does</h3><div className="setting-row"><div><strong>India-only collection</strong><span>This release requests only official CERT-In India pages. No non-Indian feeds are requested.</span></div><ShieldCheck size={17} /></div><div className="setting-row"><div><strong>Metadata-only display</strong><span>Only identifiers, titles, dates and direct links are displayed until broader reproduction permission exists.</span></div><ShieldCheck size={17} /></div><div className="setting-row"><div><strong>No invented news</strong><span>Unavailable sources produce an explicit unavailable state, never synthetic incidents.</span></div><ShieldCheck size={17} /></div></section></div></div>; }
 
 function StoryDrawer({ item, saved, onSave, onClose }: { item: RealIntelligenceItem; saved: boolean; onSave: () => void; onClose: () => void }) {
-  return <div className="drawer-backdrop" onMouseDown={onClose}><aside className="story-drawer" onMouseDown={(event) => event.stopPropagation()}><div className="drawer-top"><span className="eyebrow">{item.source} · official India record</span><div><button className="icon-button" onClick={onSave}>{saved ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}</button><button className="icon-button" onClick={onClose}><X size={19} /></button></div></div><div className="drawer-scroll"><div className="lead-pills"><SeverityPill item={item} /><SourcePill item={item} /></div><h2>{item.title}</h2><p className="drawer-dek">{item.summary}</p><div className="fact-grid"><div><span>Published</span><strong>{dateLabel(item.publishedAt)}</strong></div><div><span>Authority</span><strong>CERT-In, Government of India</strong></div><div><span>Record type</span><strong>{item.source}</strong></div><div><span>Identifier</span><strong>{item.identifier}</strong></div></div><DrawerSection title="Official source"><p>Cyber Chronicle displays metadata only. Severity, affected systems, CVEs, technical details and remediation must be read on the linked CERT-In page.</p>{item.references.map((reference) => <a className="source-row" href={reference} target="_blank" rel="noreferrer" key={reference}><ExternalLink size={17} /><div><strong>Open official CERT-In record</strong><span>{reference}</span></div></a>)}</DrawerSection><DrawerSection title="Defensive use"><p>Review the official record, determine whether the listed technology exists in your environment and follow CERT-In and vendor guidance. A published record is not proof that a specific Indian organization was compromised.</p></DrawerSection></div></aside></div>;
+  return <div className="drawer-backdrop" onMouseDown={onClose}><aside className="story-drawer" onMouseDown={(event) => event.stopPropagation()}><div className="drawer-top"><span className="eyebrow">Student guide · official CERT-In record</span><div><button className="icon-button" onClick={onSave}>{saved ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}</button><button className="icon-button" onClick={onClose}><X size={19} /></button></div></div><div className="drawer-scroll"><div className="lead-pills"><SeverityPill item={item} /><SourcePill item={item} /></div><h2>{plainTitle(item)}</h2><div className="student-drawer-summary"><span>What this means</span><p>{studentExplanation(item)}</p></div><div className="fact-grid"><div><span>Published</span><strong>{dateLabel(item.publishedAt)}</strong></div><div><span>Published by</span><strong>CERT-In, Government of India</strong></div><div><span>Type</span><strong>{evidenceLabel(item)}</strong></div><div><span>Official number</span><strong>{item.identifier}</strong></div></div><DrawerSection title="What should I do?"><div className="action-panel"><p>{studentAction(item)}</p><strong>Remember: this notice does not mean your device was attacked.</strong></div></DrawerSection><DrawerSection title="Words explained"><div className="glossary"><div><strong>Vulnerability</strong><span>A weakness in software or hardware that may create a security risk.</span></div><div><strong>Advisory</strong><span>An official notice about a security issue and the recommended next steps.</span></div><div><strong>Affected version</strong><span>A product version to which the security issue applies.</span></div><div><strong>CERT-In</strong><span>India&apos;s national agency for responding to computer-security incidents.</span></div></div></DrawerSection><DrawerSection title="Read the official details"><p>The official page contains the exact affected versions and technical safety steps. Ask a teacher or IT professional for help if the instructions are unfamiliar.</p>{item.references.map((reference) => <a className="source-row" href={reference} target="_blank" rel="noreferrer" key={reference}><ExternalLink size={17} /><div><strong>Open official CERT-In record</strong><span>{reference}</span></div></a>)}</DrawerSection></div></aside></div>;
 }
 
 function DrawerSection({ title, children }: { title: string; children: React.ReactNode }) { return <section className="drawer-section"><h3>{title}</h3>{children}</section>; }

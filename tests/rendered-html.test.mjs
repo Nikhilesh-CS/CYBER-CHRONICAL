@@ -22,7 +22,9 @@ test("server-renders the Cyber Chronicle intelligence desk", async () => {
 
   const html = await response.text();
   assert.match(html, /Cyber Chronicle/);
-  assert.match(html, /India intelligence newsroom/);
+  assert.match(html, /India cyber news, explained simply/);
+  assert.match(html, /In simple words/);
+  assert.match(html, /Check for updates/);
   assert.match(html, /India-only mode/);
   assert.match(html, /No non-Indian sources or simulated incidents are displayed/);
   assert.match(html, /India Advisories/);
@@ -37,9 +39,10 @@ test("server-renders the Cyber Chronicle intelligence desk", async () => {
 });
 
 test("ships product metadata and removes disposable starter assets", async () => {
-  const [layout, page, packageJson, manifest, serviceWorker] = await Promise.all([
+  const [layout, page, app, packageJson, manifest, serviceWorker] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/cyber-chronicle-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"),
     readFile(new URL("../public/service-worker.js", import.meta.url), "utf8"),
@@ -49,6 +52,11 @@ test("ships product metadata and removes disposable starter assets", async () =>
   assert.match(layout, /\/og\.png/);
   assert.match(layout, /\/manifest\.webmanifest/);
   assert.match(page, /CyberChronicleApp/);
+  assert.match(app, /You are already up to date/);
+  assert.match(app, /No newer record was found/);
+  assert.match(app, /What should I do\?/);
+  assert.match(app, /Words explained/);
+  assert.match(app, /does not mean your device was attacked/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.equal(JSON.parse(manifest).display, "standalone");
   assert.match(serviceWorker, /request\.mode === "navigate"/);

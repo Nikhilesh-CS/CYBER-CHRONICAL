@@ -122,6 +122,7 @@ async function fetchHtml(url: string, fetcher: typeof fetch): Promise<string> {
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
     const response = await fetcher(url, {
+      cache: "no-store",
       headers: { accept: "text/html", "user-agent": "CyberChronicle/1.0" },
       signal: controller.signal,
     });
