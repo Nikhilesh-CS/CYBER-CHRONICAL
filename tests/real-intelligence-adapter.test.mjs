@@ -30,9 +30,13 @@ function htmlResponse(payload, status = 200, contentType = "text/html; charset=I
   return new Response(payload, { status, headers: { "content-type": contentType } });
 }
 
+const certInSourceIds = ["cert-in-advisories", "cert-in-vulnerability-notes"];
+const createCertInService = (fetcher) =>
+  createRealIntelligenceService(fetcher, { sourceIds: certInSourceIds });
+
 test("returns only official CERT-In India records with explicit attribution", async () => {
   const requested = [];
-  const service = createRealIntelligenceService(async (input) => {
+  const service = createCertInService(async (input) => {
     const url = String(input);
     requested.push(url);
     return htmlResponse(url.includes("VLNLIST02") ? vulnerabilityHtml : advisoryHtml);
@@ -57,7 +61,7 @@ test("returns only official CERT-In India records with explicit attribution", as
 
 test("contains no CISA, NVD, or United States endpoints and has no non-Indian fallback", async () => {
   const requested = [];
-  const service = createRealIntelligenceService(async (input) => {
+  const service = createCertInService(async (input) => {
     const url = String(input);
     requested.push(url);
     return htmlResponse(url.includes("VLNLIST02") ? vulnerabilityHtml : advisoryHtml);
@@ -72,7 +76,7 @@ test("contains no CISA, NVD, or United States endpoints and has no non-Indian fa
 
 test("uses the short-lived cache without another network request", async () => {
   let calls = 0;
-  const service = createRealIntelligenceService(async (input) => {
+  const service = createCertInService(async (input) => {
     calls += 1;
     return htmlResponse(String(input).includes("VLNLIST02") ? vulnerabilityHtml : advisoryHtml);
   });
@@ -86,7 +90,7 @@ test("uses the short-lived cache without another network request", async () => {
 
 test("manual refresh bypasses the short-lived source cache", async () => {
   let calls = 0;
-  const service = createRealIntelligenceService(async (input) => {
+  const service = createCertInService(async (input) => {
     calls += 1;
     return htmlResponse(String(input).includes("VLNLIST02") ? vulnerabilityHtml : advisoryHtml);
   });
@@ -103,7 +107,7 @@ test("fails visibly when a newly listed CERT-In record has incomplete metadata",
     '<a href="/s2cMainServlet?pageid=PUBVLNOTES02&VLCODE=CIAD-2026-0036">',
     '<a href="/s2cMainServlet?pageid=PUBVLNOTES02&VLCODE=CIAD-2026-0037"></a><a href="/s2cMainServlet?pageid=PUBVLNOTES02&VLCODE=CIAD-2026-0036">',
   );
-  const service = createRealIntelligenceService(async (input) =>
+  const service = createCertInService(async (input) =>
     htmlResponse(String(input).includes("VLNLIST02") ? vulnerabilityHtml : incomplete));
   const payload = await service(new Date("2026-07-22T12:00:00Z"));
 
@@ -113,7 +117,7 @@ test("fails visibly when a newly listed CERT-In record has incomplete metadata",
 });
 
 test("reports partial data and never invents a failed source record", async () => {
-  const service = createRealIntelligenceService(async (input) => {
+  const service = createCertInService(async (input) => {
     if (String(input).includes("VLNLIST02")) return htmlResponse("temporarily unavailable", 503);
     return htmlResponse(advisoryHtml);
   });
@@ -127,7 +131,7 @@ test("reports partial data and never invents a failed source record", async () =
 
 test("rejects a lookalike page without CERT-In Government of India authority markers", async () => {
   const fakeHtml = advisoryHtml.replace(certInFooter, "<footer>Unofficial mirror</footer>");
-  const service = createRealIntelligenceService(async (input) =>
+  const service = createCertInService(async (input) =>
     htmlResponse(String(input).includes("VLNLIST02") ? vulnerabilityHtml : fakeHtml));
   const payload = await service(new Date("2026-07-22T12:00:00Z"));
 
@@ -138,7 +142,7 @@ test("rejects a lookalike page without CERT-In Government of India authority mar
 
 test("serves an aged snapshot after a temporary total outage", async () => {
   let fail = false;
-  const service = createRealIntelligenceService(async (input) => {
+  const service = createCertInService(async (input) => {
     if (fail) throw new Error("network unavailable");
     return htmlResponse(String(input).includes("VLNLIST02") ? vulnerabilityHtml : advisoryHtml);
   });
@@ -153,7 +157,7 @@ test("serves an aged snapshot after a temporary total outage", async () => {
 });
 
 test("fails closed when every CERT-In payload is invalid", async () => {
-  const service = createRealIntelligenceService(async () => htmlResponse("<html><body>no records</body></html>"));
+  const service = createCertInService(async () => htmlResponse("<html><body>no records</body></html>"));
   const payload = await service(new Date("2026-07-22T12:00:00Z"));
 
   assert.equal(payload.state, "unavailable");
@@ -162,9 +166,60 @@ test("fails closed when every CERT-In payload is invalid", async () => {
 });
 
 test("rejects non-HTML responses even when their body resembles a record", async () => {
-  const service = createRealIntelligenceService(async () => htmlResponse(advisoryHtml, 200, "application/json"));
+  const service = createCertInService(async () => htmlResponse(advisoryHtml, 200, "application/json"));
   const payload = await service(new Date("2026-07-22T12:00:00Z"));
 
   assert.equal(payload.state, "unavailable");
   assert.deepEqual(payload.items, []);
+});
+
+function rssResponse(title, link, description = "ransomware security incident") {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+    <rss version="2.0"><channel><title>Test feed</title><item>
+      <title><![CDATA[${title}]]></title>
+      <link>${link}</link>
+      <description><![CDATA[${description}]]></description>
+      <pubDate>Thu, 23 Jul 2026 08:00:00 GMT</pubDate>
+    </item></channel></rss>`;
+  return new Response(xml, { status: 200, headers: { "content-type": "application/rss+xml; charset=utf-8" } });
+}
+
+test("marks matching reports from independent publishers as corroborated", async () => {
+  const headline = "Major ransomware campaign targets Indian organisations";
+  const service = createRealIntelligenceService(async (input) => {
+    const url = String(input);
+    return url.includes("economictimes")
+      ? rssResponse(headline, "https://ciso.economictimes.indiatimes.com/news/cybercrime/test-story/123")
+      : rssResponse(headline, "https://www.seqrite.com/blog/test-story/");
+  }, { sourceIds: ["et-ciso-news", "seqrite-research"] });
+
+  const payload = await service(new Date("2026-07-23T09:00:00Z"));
+
+  assert.equal(payload.state, "fresh");
+  assert.equal(payload.items.length, 1);
+  assert.equal(payload.items[0].verificationStatus, "corroborated");
+  assert.equal(payload.items[0].storyState, "confirmed");
+  assert.equal(payload.items[0].confidence, "High");
+  assert.equal(payload.items[0].independentSourceCount, 2);
+  assert.equal(payload.items[0].evidence.length, 2);
+});
+
+test("keeps a single news report developing and stores metadata instead of article text", async () => {
+  const copiedText = "private body text that must never be copied into the story";
+  const service = createRealIntelligenceService(
+    async () => rssResponse(
+      "Company investigates a possible data breach",
+      "https://ciso.economictimes.indiatimes.com/news/cybercrime/test-breach/124",
+      `data breach ${copiedText}`,
+    ),
+    { sourceIds: ["et-ciso-news"] },
+  );
+
+  const payload = await service(new Date("2026-07-23T09:00:00Z"));
+  const serializedItem = JSON.stringify(payload.items[0]);
+
+  assert.equal(payload.items[0].verificationStatus, "single-source");
+  assert.equal(payload.items[0].storyState, "developing");
+  assert.equal(payload.items[0].independentSourceCount, 1);
+  assert.doesNotMatch(serializedItem, new RegExp(copiedText));
 });

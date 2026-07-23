@@ -25,8 +25,8 @@ test("server-renders the Cyber Chronicle intelligence desk", async () => {
   assert.match(html, /India cyber news, explained simply/);
   assert.match(html, /In simple words/);
   assert.match(html, /Check for updates/);
-  assert.match(html, /India-only mode/);
-  assert.match(html, /No non-Indian sources or simulated incidents are displayed/);
+  assert.match(html, /India-first newsroom/);
+  assert.match(html, /No US government feeds or simulated incidents are used/);
   assert.match(html, /India Advisories/);
   assert.match(html, /Security Records/);
   assert.match(html, /CERT-In/);
@@ -48,7 +48,7 @@ test("ships product metadata and removes disposable starter assets", async () =>
     readFile(new URL("../public/service-worker.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(layout, /Cyber Chronicle India \| CERT-In intelligence desk/);
+  assert.match(layout, /Cyber Chronicle India \| Cybersecurity newsroom/);
   assert.match(layout, /\/og\.png/);
   assert.match(layout, /\/manifest\.webmanifest/);
   assert.match(page, /CyberChronicleApp/);
@@ -56,7 +56,7 @@ test("ships product metadata and removes disposable starter assets", async () =>
   assert.match(app, /No newer record was found/);
   assert.match(app, /What should I do\?/);
   assert.match(app, /Words explained/);
-  assert.match(app, /does not mean your device was attacked/);
+  assert.match(app, /wait for direct confirmation before treating every detail as fact/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.equal(JSON.parse(manifest).display, "standalone");
   assert.match(serviceWorker, /request\.mode === "navigate"/);

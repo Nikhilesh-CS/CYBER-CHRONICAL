@@ -21,14 +21,19 @@ No candidate is enabled automatically by seeding the registry.
 
 ## Public India newsroom data adapter
 
-The hosted view requests only two hard-coded official CERT-In India pages through its server boundary:
+The hosted view uses a hard-coded, reviewed source registry:
 
-- CERT-In Advisories;
-- CERT-In Vulnerability Notes.
+- CERT-In Advisories and Vulnerability Notes;
+- RBI Notifications and SEBI RSS, with strict cyber-topic filtering;
+- ET CISO and The Hacker News for cybersecurity reporting;
+- Seqrite Labs for security research;
+- CloudSEK for threat-intelligence research.
 
-The pages are HTML rather than a public API. Responses are time- and size-bounded, checked for CERT-In and Government of India authority markers, parsed only for official identifier, title, date and source link, cached for fifteen minutes, and disclosed as fresh, cached, partial, stale or unavailable. No non-Indian fallback is permitted.
+Responses are time- and size-bounded, require the expected media type, and accept article links only from each source's allowlisted HTTPS host. The adapter extracts only title, publication date, publisher and source URL. It does not copy article bodies. Results are cached for five minutes and disclosed as fresh, cached, partial, stale or unavailable. The registry intentionally contains no US government feeds.
 
-CERT-In's copyright policy requires permission for reproduction. Until permission is obtained, the public interface remains metadata-only and directs readers to the official page for severity, affected systems, technical details and remediation.
+Official records are labelled confirmed. A non-official report remains developing and single-source unless a matching report is found from a different publisher dependency group. Confidence describes evidence strength; it is never presented as technical severity. Exact-title clustering is deliberately conservative in this MVP and is not a substitute for future claim-level semantic verification.
+
+CERT-In's copyright policy requires permission for reproduction. Until permission is obtained, its public records remain metadata-only and direct readers to the official page for severity, affected systems, technical details and remediation. All other feeds follow the same metadata-only default until an individual content-use review permits more.
 
 ## Collector rules
 

@@ -1,6 +1,6 @@
 # Cyber Chronicle India
 
-Cyber Chronicle is a laptop-first, India-only cybersecurity intelligence desk. The hosted newsroom currently displays official CERT-In advisory metadata without inventing missing details or relying on non-Indian feeds.
+Cyber Chronicle is a laptop-first, India-first cybersecurity newsroom. The hosted app collects reviewed source metadata from official Indian bodies, Indian cybersecurity news, security research, and threat-intelligence publishers without inventing missing details.
 
 ## Laptop app
 
@@ -10,18 +10,21 @@ The app checks for new records every five minutes while open, refreshes when the
 
 ## Current milestone
 
-- Live CERT-In Advisories and Vulnerability Notes
-- Official CIAD/CIVN identifiers, titles, publication dates and direct source links
+- Live CERT-In advisories and vulnerability notes
+- Curated updates from ET CISO, The Hacker News, Seqrite Labs, CloudSEK, RBI, and SEBI
+- Titles, publication dates, publisher identity, source category, and direct evidence links
 - India Standard Time presentation and India-focused interface
-- Metadata-only publication because CERT-In requires permission for broader content reproduction
+- Metadata-only collection with original, beginner-friendly explanations
+- Official, corroborated, and single-source verification labels
+- Confirmed and developing story states, with confidence kept separate from severity
 - Explicit fresh, cached, partial, stale and unavailable source states
-- Search, record-type filters and device-local saved records
-- No simulated incidents and no non-Indian live feeds
+- Search, source-category filters and device-local saved records
+- No simulated incidents and no US government feeds
 - Trusted-ingestion API with immutable raw artifacts, provenance and bounded subprocess parsing
 - Deterministic IOC/entity extraction and explainable duplicate comparison
 - PostgreSQL 16 migration and integrity verification
 
-The current public view is a verified CERT-In desk, not yet a complete account of every cyber incident affecting India. RBI and SEBI cyber-regulatory feeds can be added after strict topic filtering; other Indian sources require individual access and copyright review.
+The current public view is a curated multi-source MVP, not yet a complete account of every cyber incident affecting India. News and research reports remain developing until an official statement or another independent publisher confirms the same claim.
 
 ## Run locally
 
@@ -41,19 +44,20 @@ Complete verification:
 ## Delivery sections
 
 1. Laptop newsroom shell — complete
-2. India-only CERT-In live desk — complete
+2. India-first multi-source live desk — complete
 3. Trusted-source storage and scheduled collection — offline laptop gate complete
 4. Deterministic IOC extraction and duplicate comparison — core complete; ingestion integration remains
-5. Additional Indian regulatory and public-safety sources — planned per-source review
-6. Claim-level corroboration, publishing and operational hardening — in progress
+5. Curated Indian regulatory, news, research, and threat-intelligence feeds — MVP complete
+6. Claim-level semantic corroboration, durable publishing, and operational hardening — in progress
 
 See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/SOURCE_POLICY.md](docs/SOURCE_POLICY.md).
 
 ## Editorial principles
 
-- Only official source metadata is displayed unless reproduction rights permit more.
+- Only source metadata and Cyber Chronicle's original explanations are displayed unless reproduction rights permit more.
 - A CERT-In record is not proof that a specific Indian organization was compromised.
 - Severity or exploitation status is never inferred from a title.
-- Every displayed record links directly to CERT-In.
+- Every displayed record links directly to its publisher and lists its evidence.
+- Single-source reports remain visibly developing.
 - Source failure produces an explicit unavailable or stale state, never invented news.
 - Collected web content is hostile input and never becomes tool instructions.

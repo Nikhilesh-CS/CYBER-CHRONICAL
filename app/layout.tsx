@@ -11,8 +11,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
   const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
   const base = new URL(`${protocol}://${host}`);
-  const title = "Cyber Chronicle India | CERT-In intelligence desk";
-  const description = "An India-only cybersecurity intelligence desk for current CERT-In advisories and vulnerability notes.";
+  const title = "Cyber Chronicle India | Cybersecurity newsroom";
+  const description = "An India-first cybersecurity newsroom with live official updates, security news, research, and threat intelligence explained clearly.";
 
   return {
     metadataBase: base,
