@@ -19,7 +19,7 @@ The initial disabled candidate is Google Project Zero's official Atom feed. It w
 
 No candidate is enabled automatically by seeding the registry.
 
-## Public India newsroom data adapter
+## Public global newsroom data adapter
 
 The hosted view uses a hard-coded, reviewed source registry:
 
@@ -27,7 +27,9 @@ The hosted view uses a hard-coded, reviewed source registry:
 - RBI Notifications and SEBI RSS, with strict cyber-topic filtering;
 - ET CISO and The Hacker News for cybersecurity reporting;
 - Seqrite Labs for security research;
-- CloudSEK for threat-intelligence research.
+- CloudSEK for threat-intelligence research;
+- Microsoft Security for official vendor reporting;
+- Cisco Talos and ESET WeLiveSecurity for global security research.
 
 Responses are time- and size-bounded, require the expected media type, and accept article links only from each source's allowlisted HTTPS host. The adapter extracts only title, publication date, publisher and source URL. It does not copy article bodies. Results are cached for five minutes and disclosed as fresh, cached, partial, stale or unavailable. The registry intentionally contains no US government feeds.
 

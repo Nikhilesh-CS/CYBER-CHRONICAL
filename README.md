@@ -1,6 +1,6 @@
-# Cyber Chronicle India
+# Cyber Chronicle
 
-Cyber Chronicle is a laptop-first, India-first cybersecurity newsroom. The hosted app collects reviewed source metadata from official Indian bodies, Indian cybersecurity news, security research, and threat-intelligence publishers without inventing missing details.
+Cyber Chronicle is a reader-first global cybersecurity newspaper. The hosted app collects reviewed source metadata from official bodies, vendors, cybersecurity newsrooms, security researchers, and threat-intelligence publishers without inventing missing details.
 
 ## Laptop app
 
@@ -11,20 +11,20 @@ The app checks for new records every five minutes while open, refreshes when the
 ## Current milestone
 
 - Live CERT-In advisories and vulnerability notes
-- Curated updates from ET CISO, The Hacker News, Seqrite Labs, CloudSEK, RBI, and SEBI
+- Curated updates from CERT-In, RBI, SEBI, ET CISO, The Hacker News, Seqrite Labs, CloudSEK, Microsoft Security, Cisco Talos, and ESET WeLiveSecurity
 - Titles, publication dates, publisher identity, source category, and direct evidence links
-- India Standard Time presentation and India-focused interface
+- India Standard Time presentation with global cybersecurity coverage
 - Metadata-only collection with original, beginner-friendly explanations
 - Official, corroborated, and single-source verification labels
 - Confirmed and developing story states, with confidence kept separate from severity
 - Explicit fresh, cached, partial, stale and unavailable source states
-- Search, source-category filters and device-local saved records
+- Newspaper sections, search, light/dark themes, and device-local saved stories
 - No simulated incidents and no US government feeds
 - Trusted-ingestion API with immutable raw artifacts, provenance and bounded subprocess parsing
 - Deterministic IOC/entity extraction and explainable duplicate comparison
 - PostgreSQL 16 migration and integrity verification
 
-The current public view is a curated multi-source MVP, not yet a complete account of every cyber incident affecting India. News and research reports remain developing until an official statement or another independent publisher confirms the same claim.
+The current public view is a curated multi-source newsroom, not a complete account of every cyber incident worldwide. News and research reports remain developing until an official statement or another independent publisher confirms the same claim.
 
 ## Run locally
 
@@ -44,7 +44,7 @@ Complete verification:
 ## Delivery sections
 
 1. Laptop newsroom shell — complete
-2. India-first multi-source live desk — complete
+2. Global multi-source digital newspaper — complete
 3. Trusted-source storage and scheduled collection — offline laptop gate complete
 4. Deterministic IOC extraction and duplicate comparison — core complete; ingestion integration remains
 5. Curated Indian regulatory, news, research, and threat-intelligence feeds — MVP complete

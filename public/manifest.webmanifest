@@ -1,12 +1,12 @@
 {
-  "name": "Cyber Chronicle India",
+  "name": "Cyber Chronicle",
   "short_name": "Cyber Chronicle",
-  "description": "Laptop-ready India cybersecurity intelligence desk using official CERT-In records.",
+  "description": "Trusted cybersecurity news, explained clearly for everyone.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#080d13",
-  "theme_color": "#0d171f",
+  "background_color": "#f7f5ef",
+  "theme_color": "#08766f",
   "orientation": "any",
   "categories": ["security", "news", "productivity"],
   "icons": [

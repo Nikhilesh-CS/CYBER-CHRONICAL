@@ -6,27 +6,27 @@ The work is divided into independently verifiable sections. A section advances o
 
 Status: complete.
 
-- Establish the laptop-first application shell, design tokens, navigation, responsive rules, empty/error states, and deterministic demo data.
-- Keep the first viewport decision-oriented: highest-priority threat, confidence, evidence count, affected surface, and freshness.
+- Establish the responsive digital-newspaper shell, editorial design tokens, section navigation, light/dark themes, and clear empty/error states.
+- Keep the first viewport news-oriented: breaking story, top stories, active alerts, verification status, and freshness.
 
-Acceptance gate: the application builds; the user can identify the lead threat, its severity, confidence, and affected product without navigating away.
+Acceptance gate: the application builds; a reader can identify the lead cyber event, understand it in plain language, and see whether it is confirmed or developing.
 
-## Section 2 — Intelligence experience
+## Section 2 — Reader experience
 
 Status: complete for prototype data.
 
-- Newsroom, live feed, critical alerts, CVE dashboard, evidence drawer, search, filters, saved stories, and preferences.
-- Distinguish verified, developing, corrected, disputed, and archived states.
-- Preserve context by opening incident analysis in a drawer.
+- Breaking news, top stories, world news, active alerts, company news, privacy and data breaches, consumer security, technology and AI, trending topics, and a daily briefing.
+- Every article answers what happened, why it matters, whether the reader should care, what to do, and which sources support it.
+- Distinguish official, corroborated, and developing stories without presenting confidence as severity.
 
-Acceptance gate: a laptop user can filter current events, inspect evidence and mitigation, understand exploitation status, and save a story.
+Acceptance gate: readers on laptop or mobile can browse sections, search, read a full plain-language article, inspect evidence, change theme, and save a story locally.
 
 ## Section 3 — Trusted ingestion foundation
 
 Status: offline laptop gate complete.
 
 - Add FastAPI, PostgreSQL, migrations, a source registry, raw-artifact preservation, rate-limited RSS/API collectors, normalization, exact deduplication, job health, and audit events.
-- Begin with 10–20 authoritative government, vulnerability-authority, and vendor feeds.
+- Begin with 10–20 reviewed official, vendor, newsroom, and research feeds.
 
 Acceptance gate: repeated scheduled runs ingest the approved source set without duplicate artifacts, and every normalized document points to an immutable raw artifact.
 

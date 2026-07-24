@@ -15,21 +15,23 @@ async function render() {
   );
 }
 
-test("server-renders the Cyber Chronicle intelligence desk", async () => {
+test("server-renders the Cyber Chronicle digital newspaper", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
   assert.match(html, /Cyber Chronicle/);
-  assert.match(html, /India cyber news, explained simply/);
-  assert.match(html, /In simple words/);
-  assert.match(html, /Check for updates/);
-  assert.match(html, /India-first newsroom/);
-  assert.match(html, /No US government feeds or simulated incidents are used/);
-  assert.match(html, /India Advisories/);
-  assert.match(html, /Security Records/);
-  assert.match(html, /CERT-In/);
+  assert.match(html, /Trusted Cybersecurity News\. Simplified\./);
+  assert.match(html, /Top Stories/);
+  assert.match(html, /World Cyber News/);
+  assert.match(html, /Active Security Alerts/);
+  assert.match(html, /Privacy &amp; Data Breaches/);
+  assert.match(html, /Today’s Cyber Roundup/);
+  assert.match(html, /Editor’s Picks/);
+  assert.match(html, /Weekly Highlights/);
+  assert.match(html, /Trust is the story/);
+  assert.match(html, /Live edition/);
   assert.doesNotMatch(
     html,
     /\bCISA\b|\bNVD\b|\bNIST\b|Known Exploited Vulnerabilities|cisa\.gov|nvd\.nist\.gov/i,
@@ -48,15 +50,16 @@ test("ships product metadata and removes disposable starter assets", async () =>
     readFile(new URL("../public/service-worker.js", import.meta.url), "utf8"),
   ]);
 
-  assert.match(layout, /Cyber Chronicle India \| Cybersecurity newsroom/);
+  assert.match(layout, /Cyber Chronicle \| Trusted Cybersecurity News\. Simplified\./);
   assert.match(layout, /\/og\.png/);
   assert.match(layout, /\/manifest\.webmanifest/);
   assert.match(page, /CyberChronicleApp/);
-  assert.match(app, /You are already up to date/);
-  assert.match(app, /No newer record was found/);
-  assert.match(app, /What should I do\?/);
-  assert.match(app, /Words explained/);
-  assert.match(app, /wait for direct confirmation before treating every detail as fact/);
+  assert.match(app, /IN SIMPLE WORDS/);
+  assert.match(app, /WHY IT MATTERS/);
+  assert.match(app, /SHOULD YOU CARE\?/);
+  assert.match(app, /WHAT YOU SHOULD DO/);
+  assert.match(app, /SOURCES & TRANSPARENCY/);
+  assert.match(app, /No invented facts/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.equal(JSON.parse(manifest).display, "standalone");
   assert.match(serviceWorker, /request\.mode === "navigate"/);

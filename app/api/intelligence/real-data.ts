@@ -174,6 +174,45 @@ function sourceDefinitions(year: number): SourceDefinition[] {
     },
     {
       kind: "rss",
+      id: "microsoft-security-blog",
+      name: "Microsoft Security Blog",
+      publisher: "Microsoft Security",
+      authority: "Microsoft Security official newsroom and research",
+      category: "official",
+      trustTier: 1,
+      dependencyGroup: "microsoft",
+      url: "https://www.microsoft.com/en-us/security/blog/feed/",
+      allowedHosts: ["www.microsoft.com", "microsoft.com"],
+      strictCyberFilter: false,
+    },
+    {
+      kind: "rss",
+      id: "cisco-talos-research",
+      name: "Cisco Talos Research",
+      publisher: "Cisco Talos",
+      authority: "Cisco Talos threat research",
+      category: "security-research",
+      trustTier: 2,
+      dependencyGroup: "cisco-talos",
+      url: "https://blog.talosintelligence.com/rss/",
+      allowedHosts: ["blog.talosintelligence.com"],
+      strictCyberFilter: false,
+    },
+    {
+      kind: "rss",
+      id: "eset-welivesecurity",
+      name: "ESET WeLiveSecurity",
+      publisher: "ESET WeLiveSecurity",
+      authority: "ESET security research newsroom",
+      category: "security-research",
+      trustTier: 2,
+      dependencyGroup: "eset",
+      url: "https://www.welivesecurity.com/en/rss/feed/",
+      allowedHosts: ["www.welivesecurity.com", "welivesecurity.com"],
+      strictCyberFilter: false,
+    },
+    {
+      kind: "rss",
       id: "rbi-cyber-updates",
       name: "RBI Cyber & Digital Risk Updates",
       publisher: "Reserve Bank of India",
@@ -558,7 +597,7 @@ export function createRealIntelligenceService(
         state: successful === definitions.length ? "fresh" : "partial",
         cacheAgeSeconds: 0,
         notice: successful === definitions.length
-          ? "Live metadata retrieved from the reviewed India-first source network."
+          ? "Live metadata retrieved from the reviewed global cybersecurity source network."
           : "Some reviewed sources are unavailable. Current results and any clearly marked last verified source records are shown.",
       };
     }

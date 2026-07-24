@@ -13,14 +13,14 @@ Approved source registry
   -> confidence and severity policy
   -> editorial safety gate
   -> immutable article version
-  -> search, dashboard, briefs, and alerts
+  -> newspaper sections, article editions, daily briefs, and alerts
 ```
 
 The first production architecture should be a modular monolith that runs comfortably on a laptop. Split services only when measured load justifies it.
 
 ## Intended stack
 
-- Interface: React, TypeScript, vinext/Next-compatible App Router, Tailwind CSS
+- Interface: React, TypeScript, vinext/Next-compatible App Router, responsive editorial CSS
 - API: Python 3.12+, FastAPI, Pydantic, SQLAlchemy, Alembic
 - Storage: PostgreSQL with full-text search; `pgvector` when semantic clustering is introduced
 - Jobs: APScheduler in the first single-process prototype; Redis and durable workers when retries and backpressure require them
