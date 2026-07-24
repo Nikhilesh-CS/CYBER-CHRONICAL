@@ -2,8 +2,8 @@
   "name": "Cyber Chronicle",
   "short_name": "Cyber Chronicle",
   "description": "Trusted cybersecurity news, explained clearly for everyone.",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "/CYBER-CHRONICAL/",
+  "scope": "/CYBER-CHRONICAL/",
   "display": "standalone",
   "background_color": "#f7f5ef",
   "theme_color": "#08766f",
@@ -11,13 +11,13 @@
   "categories": ["security", "news", "productivity"],
   "icons": [
     {
-      "src": "/app-icon-192.png",
+      "src": "/CYBER-CHRONICAL/app-icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/app-icon-512.png",
+      "src": "/CYBER-CHRONICAL/app-icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

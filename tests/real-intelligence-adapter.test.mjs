@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-const moduleUrl = new URL("../app/api/intelligence/real-data.ts", import.meta.url);
+const moduleUrl = new URL("../lib/news.ts", import.meta.url);
 const { createRealIntelligenceService } = await import(moduleUrl.href);
 
 const certInFooter = `

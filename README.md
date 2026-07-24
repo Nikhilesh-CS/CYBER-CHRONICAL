@@ -1,63 +1,65 @@
 # Cyber Chronicle
 
-Cyber Chronicle is a reader-first global cybersecurity newspaper. The hosted app collects reviewed source metadata from official bodies, vendors, cybersecurity newsrooms, security researchers, and threat-intelligence publishers without inventing missing details.
+**Trusted Cybersecurity News. Simplified.**
 
-## Laptop app
+Cyber Chronicle is a student-friendly cybersecurity newspaper. It presents source-linked news from reviewed official, vendor, research, and cybersecurity-news publishers, then explains each record in clear language.
 
-The deployed desk is an installable Progressive Web App for Windows, macOS, Linux, and ChromeOS. In a supported desktop browser, use **Install app** in the command bar (or the browser's install icon) to open Cyber Chronicle in its own application window.
+## Free edition
 
-The app checks for new records every five minutes while open, refreshes when the laptop reconnects or regains focus, and provides **Refresh now** to bypass the short-lived source cache. Its service worker does not cache page navigation or API responses, so an installed copy cannot pin old intelligence.
+This branch is designed to run for **₹0** on GitHub Pages:
 
-## Current milestone
+- no database;
+- no public backend server;
+- no paid AI or API;
+- no ChatGPT subscription dependency;
+- no purchased domain;
+- no laptop exposed to the internet.
 
-- Live CERT-In advisories and vulnerability notes
-- Curated updates from CERT-In, RBI, SEBI, ET CISO, The Hacker News, Seqrite Labs, CloudSEK, Microsoft Security, Cisco Talos, and ESET WeLiveSecurity
-- Titles, publication dates, publisher identity, source category, and direct evidence links
-- India Standard Time presentation with global cybersecurity coverage
-- Metadata-only collection with original, beginner-friendly explanations
-- Official, corroborated, and single-source verification labels
-- Confirmed and developing story states, with confidence kept separate from severity
-- Explicit fresh, cached, partial, stale and unavailable source states
-- Newspaper sections, search, light/dark themes, and device-local saved stories
-- No simulated incidents and no US government feeds
-- Trusted-ingestion API with immutable raw artifacts, provenance and bounded subprocess parsing
-- Deterministic IOC/entity extraction and explainable duplicate comparison
-- PostgreSQL 16 migration and integrity verification
+GitHub Actions retrieves source metadata on a schedule, creates a static JSON edition, and publishes static HTML, CSS, JavaScript, images, and JSON. When the scheduled updater is not running, the last successfully built edition remains readable.
 
-The current public view is a curated multi-source newsroom, not a complete account of every cyber incident worldwide. News and research reports remain developing until an official statement or another independent publisher confirms the same claim.
+## How updates work
 
-## Run locally
+1. The scheduled workflow checks the fixed reviewed source list.
+2. Only metadata required for attribution is collected: headline, publisher, publication time, category, and original link.
+3. Exact duplicates and closely related titles are compared conservatively.
+4. Beginner explanations are generated using deterministic rules, not a paid AI service.
+5. The workflow builds and publishes a new static edition.
 
-Requirements: Node.js 22.13 or newer, Python 3.12+, and Docker Desktop for the PostgreSQL gate.
+The reader-facing **Refresh** button reloads the newest published snapshot. It does not contact publishers directly and does not claim that a new collection run happened.
+
+## Trusted-source rules
+
+- Every story links to its original publisher.
+- Single-source reports remain labelled as developing.
+- Official publication does not automatically mean active exploitation or a confirmed attack.
+- Missing severity, affected versions, or impact is never invented.
+- Source failures are shown honestly; a valid previous edition is kept instead of publishing an empty page.
+- Collected source content is treated as untrusted data.
+
+## Local use
+
+Requirements: Node.js 22.13 or newer.
 
 ```powershell
 npm install
+npm run news:update
 npm run dev
 ```
 
-Complete verification:
+Static production verification:
 
 ```powershell
-.\scripts\verify-all.ps1
+npm test
 ```
 
-## Delivery sections
+The exported GitHub Pages site is written to `out`.
 
-1. Laptop newsroom shell — complete
-2. Global multi-source digital newspaper — complete
-3. Trusted-source storage and scheduled collection — offline laptop gate complete
-4. Deterministic IOC extraction and duplicate comparison — core complete; ingestion integration remains
-5. Curated Indian regulatory, news, research, and threat-intelligence feeds — MVP complete
-6. Claim-level semantic corroboration, durable publishing, and operational hardening — in progress
+## Free hosting
 
-See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/SOURCE_POLICY.md](docs/SOURCE_POLICY.md).
+The workflow in `.github/workflows/free-pages.yml` supports:
 
-## Editorial principles
+- an hourly scheduled refresh;
+- manual refresh from the GitHub Actions page;
+- static GitHub Pages deployment from the `main` branch.
 
-- Only source metadata and Cyber Chronicle's original explanations are displayed unless reproduction rights permit more.
-- A CERT-In record is not proof that a specific Indian organization was compromised.
-- Severity or exploitation status is never inferred from a title.
-- Every displayed record links directly to its publisher and lists its evidence.
-- Single-source reports remain visibly developing.
-- Source failure produces an explicit unavailable or stale state, never invented news.
-- Collected web content is hostile input and never becomes tool instructions.
+Publishing is intentionally separate from local development and should only be enabled after the owner reviews the static edition.

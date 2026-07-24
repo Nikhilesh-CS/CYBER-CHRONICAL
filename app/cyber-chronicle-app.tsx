@@ -5,7 +5,7 @@ import {
   ExternalLink, Menu, Moon, RefreshCw, Search, ShieldCheck, Sun, X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { RealIntelligenceItem, RealIntelligenceResponse } from "./api/intelligence/real-data";
+import type { RealIntelligenceItem, RealIntelligenceResponse } from "../lib/news";
 
 type EditorialCategory =
   | "Top Stories"
@@ -198,7 +198,15 @@ function NewsCard({
   );
 }
 
-export function CyberChronicleApp({ initialData = EMPTY_RESPONSE }: { initialData?: RealIntelligenceResponse }) {
+export function CyberChronicleApp({
+  initialData = EMPTY_RESPONSE,
+  dataUrl = "/data/news.json",
+  serviceWorkerUrl = "/service-worker.js",
+}: {
+  initialData?: RealIntelligenceResponse;
+  dataUrl?: string;
+  serviceWorkerUrl?: string;
+}) {
   const [data, setData] = useState(initialData);
   const [selected, setSelected] = useState<RealIntelligenceItem | null>(null);
   const [query, setQuery] = useState("");
@@ -212,22 +220,22 @@ export function CyberChronicleApp({ initialData = EMPTY_RESPONSE }: { initialDat
 
   const refresh = useCallback(async (force = false) => {
     setIsRefreshing(true);
-    if (force) setRefreshMessage("The newsroom is checking every source…");
+    if (force) setRefreshMessage("Loading the latest published free edition…");
     try {
-      const suffix = force ? `?refresh=1&t=${Date.now()}` : `?t=${Date.now()}`;
-      const response = await fetch(`/api/intelligence${suffix}`, { cache: "no-store", headers: { accept: "application/json" } });
+      const separator = dataUrl.includes("?") ? "&" : "?";
+      const response = await fetch(`${dataUrl}${separator}t=${Date.now()}`, { cache: "no-store", headers: { accept: "application/json" } });
       const payload = await response.json() as RealIntelligenceResponse;
       if (!payload || !Array.isArray(payload.items)) throw new Error("Invalid newsroom response");
       setData(payload);
       setRefreshMessage(force
-        ? `Newsroom updated ${formatDate(payload.generatedAt, true)} IST · ${payload.items.length} reviewed reports`
+        ? `Latest free edition loaded ${formatDate(payload.generatedAt, true)} IST · ${payload.items.length} reviewed reports`
         : null);
     } catch {
-      setRefreshMessage("Live sources could not be checked. The last verified edition is still available.");
+      setRefreshMessage("The latest published edition could not be loaded. The current edition is still available.");
     } finally {
       setIsRefreshing(false);
     }
-  }, []);
+  }, [dataUrl]);
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem("cyber-chronicle-theme");
@@ -250,7 +258,7 @@ export function CyberChronicleApp({ initialData = EMPTY_RESPONSE }: { initialDat
       setInstallPrompt(event as InstallPrompt);
     };
     window.addEventListener("beforeinstallprompt", onInstall);
-    if ("serviceWorker" in navigator) void navigator.serviceWorker.register("/service-worker.js", { updateViaCache: "none" });
+    if ("serviceWorker" in navigator) void navigator.serviceWorker.register(serviceWorkerUrl, { updateViaCache: "none" });
     return () => {
       window.clearTimeout(restore);
       window.clearInterval(timer);
@@ -258,7 +266,7 @@ export function CyberChronicleApp({ initialData = EMPTY_RESPONSE }: { initialDat
       window.removeEventListener("online", resume);
       window.removeEventListener("beforeinstallprompt", onInstall);
     };
-  }, [refresh]);
+  }, [refresh, serviceWorkerUrl]);
 
   useEffect(() => {
     document.body.style.overflow = selected ? "hidden" : "";
@@ -340,7 +348,7 @@ export function CyberChronicleApp({ initialData = EMPTY_RESPONSE }: { initialDat
       <header className="site-header">
         <div className="utility-bar">
           <span>{formatDate(new Date().toISOString())}</span>
-          <span className="edition-status"><i />Live edition · {currentSources}/{data.sources.length} sources reporting</span>
+          <span className="edition-status"><i />Free edition · {currentSources}/{data.sources.length} sources reporting</span>
           <div>
             {installPrompt && <button onClick={() => void install()}><Download size={14} />Install app</button>}
             <button onClick={() => void refresh(true)} disabled={isRefreshing}><RefreshCw className={isRefreshing ? "spin" : ""} size={14} />{isRefreshing ? "Updating" : "Refresh"}</button>
@@ -409,7 +417,7 @@ export function CyberChronicleApp({ initialData = EMPTY_RESPONSE }: { initialDat
         <section className="trust-ribbon" aria-label="Newsroom transparency">
           <div><ShieldCheck size={20} /><span><strong>Evidence first</strong>Every story links to its sources</span></div>
           <div><Check size={20} /><span><strong>Clear status</strong>Developing reports are labelled</span></div>
-          <div><RefreshCw size={20} /><span><strong>Always current</strong>Sources checked throughout the day</span></div>
+          <div><RefreshCw size={20} /><span><strong>Updated regularly</strong>Free automation checks sources throughout the day</span></div>
           <a href="#standards">Our standards<ArrowRight size={14} /></a>
         </section>
 

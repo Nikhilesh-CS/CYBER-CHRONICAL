@@ -18,12 +18,12 @@ self.addEventListener("fetch", (event) => {
     request.method !== "GET"
     || url.origin !== self.location.origin
     || request.mode === "navigate"
-    || url.pathname.startsWith("/api/")
+    || url.pathname.includes("/api/")
   ) {
     return;
   }
 
-  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/assets/")) {
+  if (url.pathname.includes("/_next/static/") || url.pathname.includes("/assets/")) {
     event.respondWith(
       caches.open(STATIC_CACHE).then(async (cache) => {
         const cached = await cache.match(request);

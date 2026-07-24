@@ -4,23 +4,8 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 
-async function render() {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
-  return worker.fetch(
-    new Request("http://localhost/", { headers: { accept: "text/html", host: "localhost" } }),
-    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
-    { waitUntil() {}, passThroughOnException() {} },
-  );
-}
-
-test("server-renders the Cyber Chronicle digital newspaper", async () => {
-  const response = await render();
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-
-  const html = await response.text();
+test("exports the Cyber Chronicle digital newspaper as static HTML", async () => {
+  const html = await readFile(new URL("../out/index.html", import.meta.url), "utf8");
   assert.match(html, /Cyber Chronicle/);
   assert.match(html, /Trusted Cybersecurity News\. Simplified\./);
   assert.match(html, /Top Stories/);
@@ -31,7 +16,8 @@ test("server-renders the Cyber Chronicle digital newspaper", async () => {
   assert.match(html, /Editor’s Picks/);
   assert.match(html, /Weekly Highlights/);
   assert.match(html, /Trust is the story/);
-  assert.match(html, /Live edition/);
+  assert.match(html, /Free edition/);
+  assert.match(html, /\/CYBER-CHRONICAL\/data\/news\.json/);
   assert.doesNotMatch(
     html,
     /\bCISA\b|\bNVD\b|\bNIST\b|Known Exploited Vulnerabilities|cisa\.gov|nvd\.nist\.gov/i,
@@ -63,7 +49,9 @@ test("ships product metadata and removes disposable starter assets", async () =>
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.equal(JSON.parse(manifest).display, "standalone");
   assert.match(serviceWorker, /request\.mode === "navigate"/);
-  assert.match(serviceWorker, /url\.pathname\.startsWith\("\/api\/"\)/);
+  assert.match(serviceWorker, /url\.pathname\.includes\("\/api\/"\)/);
+  await access(new URL("../public/data/news.json", import.meta.url));
+  await access(new URL("../out/data/news.json", import.meta.url));
   await access(new URL("../public/og.png", import.meta.url));
   await access(new URL("../public/app-icon-192.png", import.meta.url));
   await access(new URL("../public/app-icon-512.png", import.meta.url));

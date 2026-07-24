@@ -1,9 +1,15 @@
 import { CyberChronicleApp } from "./cyber-chronicle-app";
-import { getRealIntelligence } from "./api/intelligence/real-data";
+import type { RealIntelligenceResponse } from "../lib/news";
+import newsSnapshot from "../public/data/news.json";
 
-export const dynamic = "force-dynamic";
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "/CYBER-CHRONICAL";
 
-export default async function Home() {
-  const initialData = await getRealIntelligence();
-  return <CyberChronicleApp initialData={initialData} />;
+export default function Home() {
+  return (
+    <CyberChronicleApp
+      initialData={newsSnapshot as RealIntelligenceResponse}
+      dataUrl={`${basePath}/data/news.json`}
+      serviceWorkerUrl={`${basePath}/service-worker.js`}
+    />
+  );
 }
