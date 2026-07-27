@@ -97,6 +97,153 @@ function simpleSummary(item: RealIntelligenceItem) {
   return `${item.primaryPublisher} published an update about ${plainTitle(item)}. The details are being reviewed against the available evidence.`;
 }
 
+type JargonEntry = {
+  term: string;
+  simple: string;
+  example: string;
+  matches: RegExp;
+};
+
+const JARGON_DICTIONARY: JargonEntry[] = [
+  {
+    term: "Rogue AI agent",
+    simple: "An AI program acting outside the rules it was given, either because it was misused, compromised, or given too much freedom.",
+    example: "It might access files or send information that it was never supposed to touch.",
+    matches: /\brogue ai agents?\b/i,
+  },
+  {
+    term: "AI agent",
+    simple: "An AI program that can take actions, use tools, or complete tasks instead of only answering questions.",
+    example: "An agent might open files, run software, or make changes on a user’s behalf.",
+    matches: /\bai agents?\b/i,
+  },
+  {
+    term: "Exploit",
+    simple: "A method attackers use to take advantage of a weakness in software.",
+    example: "It is like finding a broken lock and using it to get through the door.",
+    matches: /\bexploits?|exploited|weaponize[ds]?\b/i,
+  },
+  {
+    term: "Zero-day",
+    simple: "A software weakness that defenders had no patch for when attackers discovered or used it.",
+    example: "The vendor has had zero days to fix the problem before it becomes a threat.",
+    matches: /\bzero.days?\b/i,
+  },
+  {
+    term: "Vulnerability",
+    simple: "A weakness or mistake in software that could make an attack possible.",
+    example: "Think of it as a faulty lock that needs to be repaired with an update.",
+    matches: /\bvulnerabilit(?:y|ies)|\bflaws?\b/i,
+  },
+  {
+    term: "Sandbox escape",
+    simple: "A program breaks out of the restricted area designed to contain it.",
+    example: "Code meant to stay in one safe room gets access to the rest of the computer.",
+    matches: /\bsandbox escape\b/i,
+  },
+  {
+    term: "Slopsquatting",
+    simple: "Attackers create malicious software packages using names that AI tools have invented by mistake.",
+    example: "A developer follows an AI suggestion, installs the fake package, and may install malware too.",
+    matches: /\bslopsquatting\b/i,
+  },
+  {
+    term: "ClickFix",
+    simple: "A trick that tells someone to copy and run a command as a supposed fix, but the command installs malware.",
+    example: "A fake warning may ask you to press Windows+R and paste a command.",
+    matches: /\bclickfix\b/i,
+  },
+  {
+    term: "C2 (command and control)",
+    simple: "The hidden communication channel attackers use to send instructions to an infected device.",
+    example: "It works like a remote control for malware.",
+    matches: /\bc2\b|command.and.control/i,
+  },
+  {
+    term: "RAT",
+    simple: "Remote access malware that lets an attacker control a device from somewhere else.",
+    example: "An attacker may use it to view files, run commands, or spy on activity.",
+    matches: /\brat\b|remote access trojan/i,
+  },
+  {
+    term: "Ransomware",
+    simple: "Malware that locks files or systems and demands payment.",
+    example: "A business may lose access to its data until it restores a safe backup.",
+    matches: /\bransomware\b/i,
+  },
+  {
+    term: "Phishing",
+    simple: "A fake message or website designed to make someone reveal information or install something harmful.",
+    example: "A fake sign-in page may steal the password entered into it.",
+    matches: /\bphish(?:ing|ed|ers?)?\b/i,
+  },
+  {
+    term: "Privilege escalation",
+    simple: "A user or program gains more control over a computer than it should have.",
+    example: "A normal account finds a way to become an administrator.",
+    matches: /\bprivilege escalation\b|\broot access\b|\bgives?.{0,18}\broot\b/i,
+  },
+  {
+    term: "Supply-chain attack",
+    simple: "Attackers compromise software or a supplier so they can reach the people who trust and use it.",
+    example: "A poisoned update or package can spread the attack to many customers.",
+    matches: /\bsupply.chain\b|\btrojanized\b/i,
+  },
+];
+
+function jargonFor(item: RealIntelligenceItem) {
+  const title = plainTitle(item);
+  const matches = JARGON_DICTIONARY.filter((entry) => entry.matches.test(title));
+  const withoutDuplicateAiAgent = matches.filter(
+    (entry) => entry.term !== "AI agent" || !matches.some((candidate) => candidate.term === "Rogue AI agent"),
+  );
+  return withoutDuplicateAiAgent.slice(0, 4);
+}
+
+function beginnerExplanation(item: RealIntelligenceItem) {
+  const title = plainTitle(item);
+  const text = title.toLowerCase();
+
+  if (/\bslopsquatting\b/.test(text)) {
+    return "The report warns that AI tools can suggest software package names that do not exist. Attackers may create harmful packages with those names, hoping a developer installs one by mistake.";
+  }
+  if (/\bclickfix\b/.test(text)) {
+    return "The report describes fake error messages that ask people to copy and run a command. The command does not fix the computer—it can install malware instead.";
+  }
+  if (/\bsandbox escape\b/.test(text)) {
+    return "The report says code may be able to break out of the restricted area meant to contain it and reach parts of the computer that should be off-limits.";
+  }
+  if (/\bfake\b.*\b(?:teams|update)\b|\b(?:teams|update)\b.*\bfake\b/.test(text)) {
+    return "Attackers reportedly disguised harmful software as a trusted update. Installing it could let them place malware on the computer or control it remotely.";
+  }
+  if (/\brogue ai agents?\b|\bai agents?\b.*\b(?:escape|hack|attack|steal|post-exploitation)\b/.test(text)) {
+    return "The report says an AI program was able to take risky or unauthorised actions. The concern is that an agent with too much access could run commands, reach private data, or help an attacker.";
+  }
+  if (/\bprocess ghosting\b/.test(text)) {
+    return "The report describes malware hiding behind a Windows process so security tools have a harder time seeing what is really running.";
+  }
+  if (/\btelegram\b.*\bc2\b|\bc2\b.*\btelegram\b/.test(text)) {
+    return "The report says attackers used Telegram as a hidden remote-control channel for infected computers, allowing them to send instructions without running their own obvious server.";
+  }
+  if (/\b(?:exploit|exploited|vulnerabilit|flaw|zero.day)\b/.test(text)) {
+    return "The report says researchers or attackers found a weakness in the named software. If the weakness can be used in an attack, affected users may need an official update or other vendor guidance.";
+  }
+  if (/\bdata breach\b|\bleak(?:ed)?\b|\bexposed\b.*\bdata\b/.test(text)) {
+    return "The report concerns information that may have been viewed, stolen, or exposed without permission. People connected to the service should wait for confirmed details and watch for follow-up scams.";
+  }
+  if (/\bransomware\b/.test(text)) {
+    return "The report concerns malware designed to lock files or systems and demand payment. Organisations should check whether they are affected and rely on verified recovery and security guidance.";
+  }
+  if (/\bphish|\bfake (?:website|login|message|email)\b/.test(text)) {
+    return "The report describes an attempt to make people trust a fake message or website. The goal may be to steal sign-in details, money, or persuade someone to install harmful software.";
+  }
+  if (/\bmalware\b|\bspyware\b|\btrojan\b|\bstealer\b|\brat\b/.test(text)) {
+    return "The report describes harmful software that may steal information, spy on activity, or let an attacker control a device. The exact risk depends on the affected product and how the malware is delivered.";
+  }
+
+  return `In plain English, this is a report about ${title}. Cyber Chronicle has only source metadata for this item, so open the linked evidence before treating the headline as a confirmed technical explanation.`;
+}
+
 function whyItMatters(item: RealIntelligenceItem) {
   const category = editorialCategory(item);
   const copy: Record<EditorialCategory, string> = {
@@ -191,7 +338,7 @@ function NewsCard({
       <div className="card-copy">
         <div className="card-kicker"><span>{editorialCategory(item)}</span><button className="save-story" onClick={onSave} aria-label={saved ? "Remove saved story" : "Save story"}>{saved ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}</button></div>
         <h3>{plainTitle(item)}</h3>
-        {variant !== "compact" && <p>{simpleSummary(item)}</p>}
+        {variant !== "compact" && <p>{beginnerExplanation(item)}</p>}
         <StoryMeta item={item} />
       </div>
     </article>
@@ -398,7 +545,7 @@ export function CyberChronicleApp({
             <div className="lead-copy">
               <div className="lead-label"><span>{editorialCategory(hero)}</span><span>{hero.storyState === "developing" ? "Developing" : "Confirmed"}</span></div>
               <h1>{plainTitle(hero)}</h1>
-              <p>{simpleSummary(hero)}</p>
+              <p>{beginnerExplanation(hero)}</p>
               <StoryMeta item={hero} />
             </div>
           </article>
@@ -427,7 +574,7 @@ export function CyberChronicleApp({
             {alerts.map((item, index) => (
               <button className="alert-news-item" key={item.id} onClick={() => setSelected(item)}>
                 <span className="alert-number">{String(index + 1).padStart(2, "0")}</span>
-                <div><span>{verificationLabel(item)}</span><h3>{plainTitle(item)}</h3><p>{simpleSummary(item)}</p><small>{formatDate(item.publishedAt)} · {item.primaryPublisher}</small></div>
+                <div><span>{verificationLabel(item)}</span><h3>{plainTitle(item)}</h3><p>{beginnerExplanation(item)}</p><small>{formatDate(item.publishedAt)} · {item.primaryPublisher}</small></div>
                 <ChevronRight size={18} />
               </button>
             ))}
@@ -484,7 +631,7 @@ export function CyberChronicleApp({
             {editorPicks.map((item, index) => (
               <button key={item.id} onClick={() => setSelected(item)}>
                 <span>{String(index + 1).padStart(2, "0")}</span>
-                <div><small>{editorialCategory(item)}</small><h3>{plainTitle(item)}</h3><p>{simpleSummary(item)}</p></div>
+                <div><small>{editorialCategory(item)}</small><h3>{plainTitle(item)}</h3><p>{beginnerExplanation(item)}</p></div>
                 <ArrowRight size={17} />
               </button>
             ))}
@@ -532,6 +679,7 @@ export function CyberChronicleApp({
 
 function ArticleReader({ item, saved, onSave, onClose }: { item: RealIntelligenceItem; saved: boolean; onSave: () => void; onClose: () => void }) {
   const guidance = readerGuidance(item);
+  const jargon = jargonFor(item);
   return (
     <div className="article-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <article className="article-reader" role="dialog" aria-modal="true" aria-labelledby="article-title">
@@ -544,7 +692,7 @@ function ArticleReader({ item, saved, onSave, onClose }: { item: RealIntelligenc
           <header className="article-header">
             <span className="article-section">{editorialCategory(item)}</span>
             <h1 id="article-title">{plainTitle(item)}</h1>
-            <p className="article-deck">{simpleSummary(item)}</p>
+            <p className="article-deck">{beginnerExplanation(item)}</p>
             <div className="article-byline"><div className="author-mark">CC</div><span><strong>Cyber Chronicle Newsroom</strong><small>Published {formatDate(item.publishedAt, true)} IST · Updated from live sources</small></span></div>
             <StoryMeta item={item} />
           </header>
@@ -554,7 +702,24 @@ function ArticleReader({ item, saved, onSave, onClose }: { item: RealIntelligenc
           <section className="article-block simple-words">
             <span>IN SIMPLE WORDS</span>
             <h2>Here’s what this means</h2>
-            <p>{simpleSummary(item)}</p>
+            <p>{beginnerExplanation(item)}</p>
+            {jargon.length > 0 && (
+              <div className="jargon-section">
+                <div className="jargon-heading">
+                  <strong>Jargon decoder</strong>
+                  <small>Technical words from this headline, translated</small>
+                </div>
+                <div className="jargon-grid">
+                  {jargon.map((entry) => (
+                    <div className="jargon-card" key={entry.term}>
+                      <h3>{entry.term}</h3>
+                      <p>{entry.simple}</p>
+                      <small><b>Example:</b> {entry.example}</small>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="article-block">

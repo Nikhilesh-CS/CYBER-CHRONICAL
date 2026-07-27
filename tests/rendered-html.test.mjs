@@ -41,6 +41,11 @@ test("ships product metadata and removes disposable starter assets", async () =>
   assert.match(layout, /\/manifest\.webmanifest/);
   assert.match(page, /CyberChronicleApp/);
   assert.match(app, /IN SIMPLE WORDS/);
+  assert.match(app, /Jargon decoder/);
+  assert.match(app, /beginnerExplanation/);
+  assert.match(app, /Slopsquatting/);
+  assert.match(app, /ClickFix/);
+  assert.match(app, /C2 \(command and control\)/);
   assert.match(app, /WHY IT MATTERS/);
   assert.match(app, /SHOULD YOU CARE\?/);
   assert.match(app, /WHAT YOU SHOULD DO/);
