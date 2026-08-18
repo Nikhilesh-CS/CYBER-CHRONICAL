@@ -4,11 +4,17 @@
   "description": "Trusted cybersecurity news, explained clearly for everyone.",
   "start_url": "/CYBER-CHRONICAL/",
   "scope": "/CYBER-CHRONICAL/",
+  "id": "/CYBER-CHRONICAL/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#f7f5ef",
   "theme_color": "#08766f",
   "orientation": "any",
   "categories": ["security", "news", "productivity"],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "handle_links": "preferred",
   "icons": [
     {
       "src": "/CYBER-CHRONICAL/app-icon-192.png",
@@ -21,6 +27,21 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Security Alerts",
+      "short_name": "Alerts",
+      "url": "/CYBER-CHRONICAL/#alerts",
+      "icons": []
+    },
+    {
+      "name": "Saved Stories",
+      "short_name": "Saved",
+      "url": "/CYBER-CHRONICAL/",
+      "icons": []
     }
   ]
 }
