@@ -23,7 +23,7 @@ function sourceError(error: unknown): string {
   return error instanceof Error ? error.message.slice(0, 160) : "Upstream request failed";
 }
 
-function mergeItems(items: RealIntelligenceItem[]): RealIntelligenceItem[] {
+export function mergeItems(items: RealIntelligenceItem[]): RealIntelligenceItem[] {
   const unique = [...new Map(items.map((item) => [item.id, item])).values()];
   const clusters = new Map<string, RealIntelligenceItem[]>();
   for (const item of unique) {
@@ -42,6 +42,7 @@ function mergeItems(items: RealIntelligenceItem[]): RealIntelligenceItem[] {
     const evidence = [...new Map(group.flatMap((item) => item.evidence).map((entry) => [entry.url, entry])).values()];
     const independentSourceCount = new Set(evidence.map((entry) => entry.dependencyGroup)).size;
     const official = evidence.some((entry) => entry.trustTier === 1);
+    const imageUrl = primary.imageUrl || group.find(item => item.imageUrl)?.imageUrl;
     return {
       ...primary,
       references: evidence.map((entry) => entry.url),
@@ -53,6 +54,7 @@ function mergeItems(items: RealIntelligenceItem[]): RealIntelligenceItem[] {
       studentSummary: independentSourceCount >= 2 && !official
         ? `${independentSourceCount} independent publishers report the same update. Open the evidence links to compare what each source confirms.`
         : primary.studentSummary,
+      imageUrl,
     };
   });
   return merged.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));

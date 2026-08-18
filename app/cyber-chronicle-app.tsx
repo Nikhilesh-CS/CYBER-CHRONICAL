@@ -431,7 +431,24 @@ export function CyberChronicleApp({
       <section className="lead-grid" aria-label="Lead stories">
         <article className="lead-article">
           <button className="lead-click" onClick={() => markAsRead(hero)} aria-label={`Read ${plainTitle(hero)}`} />
-          <div className={`lead-visual art-${categorySlug(editorialCategory(hero))}`}>
+          {hero.imageUrl ? (
+            <img
+              src={hero.imageUrl}
+              alt={plainTitle(hero)}
+              className="lead-visual news-image"
+              loading="eager"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = "none";
+                const fallback = target.nextElementSibling as HTMLElement;
+                if (fallback) fallback.style.display = "flex";
+              }}
+            />
+          ) : null}
+          <div
+            className={`lead-visual art-${categorySlug(editorialCategory(hero))}`}
+            style={{ display: hero.imageUrl ? "none" : "flex" }}
+          >
             <span>CYBER CHRONICLE</span>
             <b>{editorialCategory(hero)}</b>
             <em>Verified reporting from the live newsroom</em>

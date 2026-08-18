@@ -55,6 +55,7 @@ export type RealIntelligenceItem = {
   unknowns: string[];
 
   metadata: StoryMetadata;
+  imageUrl?: string;
 };
 
 export type SourceResult = {
