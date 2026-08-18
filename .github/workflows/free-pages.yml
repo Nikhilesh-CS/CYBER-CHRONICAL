@@ -56,3 +56,9 @@ jobs:
       - name: Publish GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Notify subscribers of critical alerts
+        if: success()
+        run: node scripts/send-push-notifications.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
