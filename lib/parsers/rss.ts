@@ -18,6 +18,40 @@ function rssStudentSummary(definition: SourceDefinition, title: string): string 
   return `${definition.publisher} reports “${title}”. This is a developing news report until a direct statement or another independent source confirms the main claim.`;
 }
 
+function extractImageUrl(block: string, baseUrl: string): string | undefined {
+  const patterns = [
+    /<media:content[^>]+url=["']([^"']+)["']/i,
+    /<media:thumbnail[^>]+url=["']([^"']+)["']/i,
+    /<enclosure[^>]+url=["']([^"']+)["'][^>]*type=["']image\//i,
+    /<enclosure[^>]+type=["']image\/[^>]+url=["']([^"']+)["']/i,
+    /<content:encoded>[\s\S]*?<img[^>]+src=["']([^"']+)["']/i,
+    /<description>[\s\S]*?<img[^>]+src=["']([^"']+)["']/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = pattern.exec(block);
+    if (match && match[1]) {
+      let url = match[1].trim();
+      if (url.startsWith('data:') || url.startsWith('javascript:')) continue;
+      
+      if (url.startsWith('//')) {
+        url = `https:${url}`;
+      } else if (url.startsWith('/')) {
+        try {
+          url = new URL(url, baseUrl).toString();
+        } catch {
+          continue;
+        }
+      }
+
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        return url;
+      }
+    }
+  }
+  return undefined;
+}
+
 export async function fetchXml(url: string, fetcher: typeof fetch): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -76,6 +110,7 @@ export function parseRssFeed(xml: string, definition: SourceDefinition): RealInt
     const studentSummary = rssStudentSummary(definition, title);
     
     const finalCategories = enhanceCategories(definition.categories, title, description);
+    const imageUrl = extractImageUrl(block, parsedUrl.origin);
     
     items.push({
       id: key,
@@ -113,6 +148,7 @@ export function parseRssFeed(xml: string, definition: SourceDefinition): RealInt
             affected: "Check the linked source for affected people, organisations, products, or versions",
           }
         : { type: "general" },
+      ...(imageUrl ? { imageUrl } : {}),
     });
     if (items.length >= 25) break;
   }

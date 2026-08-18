@@ -22,7 +22,25 @@ export function NewsCard({
   return (
     <article className={`news-card news-card-${variant}`}>
       <button className="card-hitbox" onClick={onOpen} aria-label={`Read ${plainTitle(item)}`} />
-      <div className={`story-art art-${categorySlug(editorialCategory(item))}`}>
+      {item.imageUrl ? (
+        <img
+          src={item.imageUrl}
+          alt={plainTitle(item)}
+          className="story-art news-image"
+          loading="lazy"
+          onError={(e) => {
+            // Fallback to the CSS art if the image fails to load
+            const target = e.target as HTMLImageElement;
+            target.style.display = "none";
+            const fallback = target.nextElementSibling as HTMLElement;
+            if (fallback) fallback.style.display = "flex";
+          }}
+        />
+      ) : null}
+      <div
+        className={`story-art art-${categorySlug(editorialCategory(item))}`}
+        style={{ display: item.imageUrl ? "none" : "flex" }}
+      >
         <span>{editorialCategory(item)}</span>
         <b>CC</b>
       </div>

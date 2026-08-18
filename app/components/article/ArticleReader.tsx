@@ -38,6 +38,17 @@ export function ArticleReader({ item, saved, onSave, onClose }: {
         </div>
         <div className="article-body">
           <header className="article-header">
+            {item.imageUrl && (
+              <img
+                src={item.imageUrl}
+                alt={title}
+                className="article-hero-image news-image"
+                loading="eager"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+            )}
             <span className="article-section">{editorialCategory(item)}</span>
             <h1 id="article-title">{title}</h1>
             <p className="article-deck">{explanation}</p>
