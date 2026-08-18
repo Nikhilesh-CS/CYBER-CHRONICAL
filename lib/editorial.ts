@@ -1,4 +1,4 @@
-import type { RealIntelligenceItem } from "./news";
+import type { RealIntelligenceItem } from "./news.ts";
 
 export type EditorialCategory =
   | "Top Stories"
@@ -20,7 +20,10 @@ export const categories: EditorialCategory[] = [
 ];
 
 export function plainTitle(item: RealIntelligenceItem) {
-  return item.title.replace(`${item.identifier}: `, "");
+  if (item.metadata?.type === "cyber" && item.metadata.identifier) {
+    return item.title.replace(`${item.metadata.identifier}: `, "");
+  }
+  return item.title.replace(/^CC-[A-Z0-9]+:\s*/, "");
 }
 
 export function formatDate(value: string, includeTime = false) {
@@ -46,7 +49,7 @@ export function relativeTime(value: string) {
 
 export function editorialCategory(item: RealIntelligenceItem): EditorialCategory {
   const text = plainTitle(item).toLowerCase();
-  if (item.sourceCategory === "official" || /\b(advisory|patch|vulnerabilit|exploit|zero.day|security update)\b/.test(text)) {
+  if (item.verificationStatus === "official" || /\b(advisory|patch|vulnerabilit|exploit|zero.day|security update)\b/.test(text)) {
     return "Active Security Alerts";
   }
   if (/\b(breach|leak|privacy|personal data|stolen data|exposed|identity)\b/.test(text)) {
@@ -119,7 +122,7 @@ export function readerGuidance(item: RealIntelligenceItem): readonly (readonly [
 }
 
 export function practicalActions(item: RealIntelligenceItem) {
-  if (item.sourceCategory === "official") {
+  if (item.verificationStatus === "official") {
     return [
       "Open the official advisory and check the affected products or versions.",
       "Install approved security updates or follow the vendor's mitigation guidance.",

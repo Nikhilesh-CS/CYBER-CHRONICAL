@@ -1,5 +1,5 @@
-import type { RealIntelligenceItem } from "./news";
-import { plainTitle } from "./editorial";
+import type { RealIntelligenceItem } from "./news.ts";
+import { plainTitle } from "./editorial.ts";
 
 export function beginnerExplanation(item: RealIntelligenceItem) {
   const title = plainTitle(item);

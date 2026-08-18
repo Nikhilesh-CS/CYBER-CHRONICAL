@@ -27,7 +27,14 @@ export function NewsCard({
         <b>CC</b>
       </div>
       <div className="card-copy">
-        <div className="card-kicker"><span>{editorialCategory(item)}</span><button className="save-story" onClick={onSave} aria-label={saved ? "Remove saved story" : "Save story"}>{saved ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}</button></div>
+        <div className="card-kicker">
+          <div className="category-chips">
+            {(item.categories || []).slice(0, 3).map(cat => (
+              <span key={cat} className="category-chip">[{cat.charAt(0).toUpperCase() + cat.slice(1)}]</span>
+            ))}
+          </div>
+          <button className="save-story" onClick={onSave} aria-label={saved ? "Remove saved story" : "Save story"}>{saved ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}</button>
+        </div>
         <h3>{plainTitle(item)}</h3>
         {variant !== "compact" && <p>{beginnerExplanation(item)}</p>}
         <StoryMeta item={item} />

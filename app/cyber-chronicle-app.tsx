@@ -19,6 +19,8 @@ import { ShareButton } from "./components/shared/ShareButton";
 import { MobileTabBar, type MobileTab } from "./components/app-shell/MobileTabBar";
 import { PullToRefresh } from "./components/app-shell/PullToRefresh";
 import { NotificationManager } from "./components/app-shell/NotificationManager";
+import { messaging } from "../lib/firebase";
+import { onMessage } from "firebase/messaging";
 
 type InstallPrompt = Event & {
   prompt: () => Promise<void>;
@@ -51,8 +53,10 @@ export function CyberChronicleApp({
   const [mobileMenu, setMobileMenu] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [saved, setSaved] = useState<string[]>([]);
+  const [readAlerts, setReadAlerts] = useState<string[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const [foregroundAlert, setForegroundAlert] = useState<{ title: string, storyId: string } | null>(null);
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileTab>("home");
   const [isOnline, setIsOnline] = useState(true);
@@ -79,6 +83,7 @@ export function CyberChronicleApp({
   useEffect(() => {
     const storedTheme = window.localStorage.getItem("cyber-chronicle-theme");
     const storedSaved = window.localStorage.getItem("cyber-chronicle-saved");
+    const storedReadAlerts = window.localStorage.getItem("cyber-chronicle-read-alerts");
     const restore = window.setTimeout(() => {
       if (storedTheme === "dark") {
         setTheme("dark");
@@ -86,6 +91,9 @@ export function CyberChronicleApp({
       }
       if (storedSaved) {
         try { setSaved(JSON.parse(storedSaved)); } catch { setSaved([]); }
+      }
+      if (storedReadAlerts) {
+        try { setReadAlerts(JSON.parse(storedReadAlerts)); } catch { setReadAlerts([]); }
       }
     }, 0);
     const timer = window.setInterval(() => void refresh(), 5 * 60_000);
@@ -98,7 +106,11 @@ export function CyberChronicleApp({
       setInstallPrompt(event as InstallPrompt);
     };
     window.addEventListener("beforeinstallprompt", onInstall);
-    if ("serviceWorker" in navigator) void navigator.serviceWorker.register(serviceWorkerUrl, { updateViaCache: "none" });
+    if ("serviceWorker" in navigator) {
+      const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+      const swParams = apiKey ? `?apiKey=${apiKey}&projectId=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}&messagingSenderId=${process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}&appId=${process.env.NEXT_PUBLIC_FIREBASE_APP_ID}` : "";
+      void navigator.serviceWorker.register(`${serviceWorkerUrl}${swParams}`, { updateViaCache: "none" });
+    }
     setIsOnline(navigator.onLine);
     return () => {
       window.clearTimeout(restore);
@@ -111,7 +123,12 @@ export function CyberChronicleApp({
   useEffect(() => {
     document.body.style.overflow = selected ? "hidden" : "";
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSelected(null);
+      if (event.key === "Escape") {
+        setSelected(null);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("story");
+        window.history.replaceState({}, "", url.toString());
+      }
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => {
@@ -128,7 +145,7 @@ export function CyberChronicleApp({
     const needle = query.trim().toLowerCase();
     return ordered.filter((item) => {
       const categoryMatches = activeCategory === "Latest" || activeCategory === "Top Stories" || editorialCategory(item) === activeCategory;
-      const searchMatches = !needle || `${plainTitle(item)} ${item.primaryPublisher} ${item.identifier}`.toLowerCase().includes(needle);
+      const searchMatches = !needle || `${plainTitle(item)} ${item.primaryPublisher} ${item.metadata?.type === "cyber" ? item.metadata.identifier : ""}`.toLowerCase().includes(needle);
       return categoryMatches && searchMatches;
     });
   }, [activeCategory, ordered, query]);
@@ -141,7 +158,7 @@ export function CyberChronicleApp({
   const enterprise = ordered.filter((item) => editorialCategory(item) === "Company & Enterprise").slice(0, 4);
   const technology = ordered.filter((item) => editorialCategory(item) === "Technology & AI").slice(0, 4);
   const world = ordered.filter((item) => editorialCategory(item) === "World Cyber News").slice(0, 4);
-  const editorPicks = ordered.filter((item) => item.verificationStatus !== "single-source" || item.sourceCategory === "security-research").slice(0, 3);
+  const editorPicks = ordered.filter((item) => item.verificationStatus !== "single-source").slice(0, 3);
   const editionTime = Date.parse(data.generatedAt);
   const weeklyCutoff = Number.isFinite(editionTime) ? editionTime - 7 * 24 * 60 * 60 * 1_000 : 0;
   const weeklyHighlights = ordered.filter((item) => Date.parse(item.publishedAt) >= weeklyCutoff).slice(8, 12);
@@ -162,6 +179,72 @@ export function CyberChronicleApp({
       return next;
     });
   };
+
+  const markAsRead = (item: RealIntelligenceItem) => {
+    setSelected(item);
+    if (editorialCategory(item) === "Active Security Alerts" && !readAlerts.includes(item.id)) {
+      setReadAlerts((current) => {
+        const next = [...current, item.id];
+        window.localStorage.setItem("cyber-chronicle-read-alerts", JSON.stringify(next));
+        return next;
+      });
+    }
+  };
+
+  const openStoryById = useCallback(async (storyId: string) => {
+    let item = data.items.find(x => x.id === storyId);
+    if (!item) {
+      try {
+        const separator = dataUrl.includes("?") ? "&" : "?";
+        const response = await fetch(`${dataUrl}${separator}t=${Date.now()}`, { cache: "no-store", headers: { accept: "application/json" } });
+        const payload = await response.json() as RealIntelligenceResponse;
+        if (payload && Array.isArray(payload.items)) {
+          item = payload.items.find(x => x.id === storyId);
+          if (item) setData(payload);
+        }
+      } catch {
+        // ignore network error
+      }
+    }
+    if (item) {
+      markAsRead(item);
+    } else {
+      alert("This story isn't available in your saved edition.");
+    }
+  }, [data.items, dataUrl, readAlerts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const storyId = params.get("story");
+    if (storyId) {
+      void openStoryById(storyId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === "NAVIGATE") {
+        const url = new URL(event.data.url, window.location.origin);
+        const storyId = url.searchParams.get("story");
+        if (storyId) {
+          void openStoryById(storyId);
+        }
+      }
+    };
+    navigator.serviceWorker?.addEventListener("message", handleMessage);
+    return () => navigator.serviceWorker?.removeEventListener("message", handleMessage);
+  }, [openStoryById]);
+
+  useEffect(() => {
+    if (!messaging) return;
+    const unsubscribe = onMessage(messaging, (payload) => {
+      if (payload.data && payload.data.title && payload.data.storyId) {
+        setForegroundAlert({ title: payload.data.title, storyId: payload.data.storyId });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const install = async () => {
     if (!installPrompt) return;
@@ -269,7 +352,7 @@ export function CyberChronicleApp({
       ) : (
         <div className="saved-list">
           {savedItems.map((item) => (
-            <NewsCard key={item.id} item={item} variant="compact" saved onSave={() => toggleSaved(item.id)} onOpen={() => setSelected(item)} />
+            <NewsCard key={item.id} item={item} variant="compact" saved onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />
           ))}
         </div>
       )}
@@ -297,7 +380,7 @@ export function CyberChronicleApp({
         <div className="search-results">
           <small>{filtered.length} {filtered.length === 1 ? "result" : "results"}</small>
           {filtered.map((item) => (
-            <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => setSelected(item)} />
+            <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />
           ))}
           {filtered.length === 0 && <p className="search-no-results">No stories match &ldquo;{query}&rdquo;</p>}
         </div>
@@ -325,7 +408,7 @@ export function CyberChronicleApp({
       </div>
       <div className="alerts-full-list">
         {ordered.filter((item) => editorialCategory(item) === "Active Security Alerts").map((item, index) => (
-          <button className="alert-news-item" key={item.id} onClick={() => setSelected(item)}>
+          <button className="alert-news-item" key={item.id} onClick={() => markAsRead(item)}>
             <span className="alert-number">{String(index + 1).padStart(2, "0")}</span>
             <div><span>{verificationLabel(item)}</span><h3>{plainTitle(item)}</h3><p>{beginnerExplanation(item)}</p><small>{formatDate(item.publishedAt)} · {item.primaryPublisher}</small></div>
             <ChevronRight size={18} />
@@ -347,7 +430,7 @@ export function CyberChronicleApp({
 
       <section className="lead-grid" aria-label="Lead stories">
         <article className="lead-article">
-          <button className="lead-click" onClick={() => setSelected(hero)} aria-label={`Read ${plainTitle(hero)}`} />
+          <button className="lead-click" onClick={() => markAsRead(hero)} aria-label={`Read ${plainTitle(hero)}`} />
           <div className={`lead-visual art-${categorySlug(editorialCategory(hero))}`}>
             <span>CYBER CHRONICLE</span>
             <b>{editorialCategory(hero)}</b>
@@ -364,7 +447,7 @@ export function CyberChronicleApp({
         <aside className="top-stories">
           <SectionHeading kicker="The latest" title="Top Stories" />
           {topStories.map((item, index) => (
-            <button className="top-story" key={item.id} onClick={() => setSelected(item)}>
+            <button className="top-story" key={item.id} onClick={() => markAsRead(item)}>
               <span>0{index + 1}</span>
               <div><small>{editorialCategory(item)}</small><h3>{plainTitle(item)}</h3><p>{relativeTime(item.publishedAt)} · {item.primaryPublisher}</p></div>
             </button>
@@ -383,7 +466,7 @@ export function CyberChronicleApp({
         <SectionHeading kicker="Need to know" title="Active Security Alerts" action="View all alerts" onAction={() => handleTabChange("alerts")} />
         <div className="alert-news-grid">
           {alerts.map((item, index) => (
-            <button className="alert-news-item" key={item.id} onClick={() => setSelected(item)}>
+            <button className="alert-news-item" key={item.id} onClick={() => markAsRead(item)}>
               <span className="alert-number">{String(index + 1).padStart(2, "0")}</span>
               <div><span>{verificationLabel(item)}</span><h3>{plainTitle(item)}</h3><p>{beginnerExplanation(item)}</p><small>{formatDate(item.publishedAt)} · {item.primaryPublisher}</small></div>
               <ChevronRight size={18} />
@@ -395,7 +478,7 @@ export function CyberChronicleApp({
       <section className="news-section">
         <SectionHeading kicker="Across the internet" title="World Cyber News" />
         <div className="four-card-grid">
-          {world.map((item, index) => <NewsCard key={item.id} item={item} variant={index === 0 ? "feature" : "standard"} saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => setSelected(item)} />)}
+          {world.map((item, index) => <NewsCard key={item.id} item={item} variant={index === 0 ? "feature" : "standard"} saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
         </div>
       </section>
 
@@ -403,13 +486,13 @@ export function CyberChronicleApp({
         <div className="news-section">
           <SectionHeading kicker="Business" title="Company & Enterprise" />
           <div className="stacked-news">
-            {enterprise.map((item) => <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => setSelected(item)} />)}
+            {enterprise.map((item) => <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
           </div>
         </div>
         <div className="news-section">
           <SectionHeading kicker="Your information" title="Privacy & Data Breaches" />
           <div className="stacked-news">
-            {privacy.map((item) => <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => setSelected(item)} />)}
+            {privacy.map((item) => <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
           </div>
         </div>
       </section>
@@ -417,7 +500,7 @@ export function CyberChronicleApp({
       <section className="daily-briefing">
         <div className="briefing-intro"><span>THE DAILY BRIEFING</span><h2>Today&apos;s Cyber Roundup</h2><p>The essential cybersecurity stories, explained in a few minutes.</p><small>{formatDate(data.generatedAt, true)} IST</small></div>
         <ol>
-          {ordered.slice(0, 5).map((item) => <li key={item.id}><button onClick={() => setSelected(item)}><span>{editorialCategory(item)}</span><strong>{plainTitle(item)}</strong><ArrowRight size={15} /></button></li>)}
+          {ordered.slice(0, 5).map((item) => <li key={item.id}><button onClick={() => markAsRead(item)}><span>{editorialCategory(item)}</span><strong>{plainTitle(item)}</strong><ArrowRight size={15} /></button></li>)}
         </ol>
       </section>
 
@@ -425,13 +508,13 @@ export function CyberChronicleApp({
         <div className="news-section">
           <SectionHeading kicker="Everyday safety" title="Mobile & Consumer Security" />
           <div className="stacked-news">
-            {consumer.map((item) => <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => setSelected(item)} />)}
+            {consumer.map((item) => <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
           </div>
         </div>
         <div className="news-section">
           <SectionHeading kicker="The future" title="Technology & AI Security" />
           <div className="stacked-news">
-            {technology.map((item) => <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => setSelected(item)} />)}
+            {technology.map((item) => <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
           </div>
         </div>
       </section>
@@ -440,7 +523,7 @@ export function CyberChronicleApp({
         <div className="editors-picks">
           <SectionHeading kicker="Chosen for clarity" title="Editor's Picks" />
           {editorPicks.map((item, index) => (
-            <button key={item.id} onClick={() => setSelected(item)}>
+            <button key={item.id} onClick={() => markAsRead(item)}>
               <span>{String(index + 1).padStart(2, "0")}</span>
               <div><small>{editorialCategory(item)}</small><h3>{plainTitle(item)}</h3><p>{beginnerExplanation(item)}</p></div>
               <ArrowRight size={17} />
@@ -451,7 +534,7 @@ export function CyberChronicleApp({
           <SectionHeading kicker="The week in cyber" title="Weekly Highlights" />
           <div>
             {weeklyHighlights.map((item) => (
-              <button key={item.id} onClick={() => setSelected(item)}>
+              <button key={item.id} onClick={() => markAsRead(item)}>
                 <span>{formatDate(item.publishedAt)}</span>
                 <strong>{plainTitle(item)}</strong>
                 <small>{item.primaryPublisher}</small>
@@ -524,10 +607,18 @@ export function CyberChronicleApp({
 
         <div className="breaking-strip">
           <strong>BREAKING</strong>
-          <button onClick={() => setSelected(hero)}><span>{plainTitle(hero)}</span><ChevronRight size={15} /></button>
+          <button onClick={() => markAsRead(hero)}><span>{plainTitle(hero)}</span><ChevronRight size={15} /></button>
           <small>{relativeTime(hero.publishedAt)}</small>
         </div>
         {refreshMessage && <div className="refresh-note"><Check size={15} />{refreshMessage}<button onClick={() => setRefreshMessage(null)} aria-label="Dismiss update message"><X size={14} /></button></div>}
+        {foregroundAlert && (
+          <div className="refresh-note alert-banner" style={{ backgroundColor: "var(--red-900)", color: "white", borderColor: "var(--red-700)" }}>
+            <ShieldCheck size={15} />
+            <span style={{ flex: 1 }}><strong>New Alert</strong>: {foregroundAlert.title.replace('⚠️ ', '')}</span>
+            <button style={{ background: "white", color: "var(--red-900)", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: "bold" }} onClick={() => { setForegroundAlert(null); void openStoryById(foregroundAlert.storyId); }}>Open story</button>
+            <button onClick={() => setForegroundAlert(null)} aria-label="Dismiss"><X size={14} /></button>
+          </div>
+        )}
       </header>
 
       <PullToRefresh onRefresh={() => refresh(true)}>
@@ -543,12 +634,17 @@ export function CyberChronicleApp({
       <MobileTabBar
         active={mobileTab}
         onChange={handleTabChange}
-        alertCount={alerts.length}
+        alertCount={alerts.filter(item => !readAlerts.includes(item.id)).length}
         savedCount={saved.length}
       />
 
       {selected && (
-        <ArticleReader item={selected} saved={saved.includes(selected.id)} onSave={() => toggleSaved(selected.id)} onClose={() => setSelected(null)} />
+        <ArticleReader item={selected} saved={saved.includes(selected.id)} onSave={() => toggleSaved(selected.id)} onClose={() => {
+          setSelected(null);
+          const url = new URL(window.location.href);
+          url.searchParams.delete("story");
+          window.history.replaceState({}, "", url.toString());
+        }} />
       )}
     </div>
   );

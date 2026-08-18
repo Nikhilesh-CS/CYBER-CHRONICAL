@@ -17,6 +17,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 
 const FIREBASE_SERVICE_ACCOUNT = process.env.FIREBASE_SERVICE_ACCOUNT;
+const BATCH_SIZE = 500;
 const NEWS_PATH = resolve("public/data/news.json");
 async function readJson(path) {
   try {
@@ -38,11 +39,10 @@ async function main() {
     return;
   }
 
-  /* Filter for official or high-confidence stories */
+  /* Filter for official or high-confidence cyber stories */
   const potentialAlerts = edition.items.filter((item) =>
-    (
-      item.sourceCategory === "official" ||
-      item.verificationStatus === "corroborated" ||
+    item.metadata?.type === "cyber" && (
+      item.verificationStatus === "official" ||
       item.confidence === "High"
     )
   );
@@ -108,28 +108,19 @@ async function main() {
       continue;
     }
 
-    const title = alert.title.replace(`${alert.identifier}: `, "");
-    const body = alert.studentSummary || `New ${alert.sourceCategory} update from ${alert.primaryPublisher}`;
+    const title = alert.metadata?.identifier ? alert.title.replace(`${alert.metadata.identifier}: `, "") : alert.title.replace(/^CC-[A-Z0-9]+:\s*/, "");
+    const body = alert.studentSummary || `New verified update from ${alert.primaryPublisher}`;
 
     const messageTemplate = {
-      notification: {
+      data: {
         title: `⚠️ ${title}`,
         body,
-      },
-      data: {
-        title,
-        body,
-        tag: alert.id,
-        url: "/CYBER-CHRONICAL/",
-      },
-      webpush: {
-        notification: {
-          icon: "/CYBER-CHRONICAL/app-icon-192.png",
-          click_action: "/CYBER-CHRONICAL/",
-        }
+        storyId: alert.id,
+        url: `/CYBER-CHRONICAL/?story=${encodeURIComponent(alert.id)}`,
       }
     };
 
+    let totalSuccessCount = 0;
     // Batch send to a maximum of 500 tokens per request
     for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
       const tokensBatch = tokens.slice(i, i + BATCH_SIZE);
@@ -141,6 +132,7 @@ async function main() {
           tokens: tokensBatch,
         });
 
+        totalSuccessCount += response.successCount;
         console.log(`  ✓ Notified batch of ${tokensBatch.length}: ${title.slice(0, 60)}…`);
         console.log(`    Success: ${response.successCount}, Failed: ${response.failureCount}`);
 
@@ -160,9 +152,11 @@ async function main() {
       }
     }
 
-    // Mark as notified
-    await notifiedDocRef.set({ sentAt: new Date().toISOString() });
-    notificationsSent++;
+    // Mark as notified if at least one delivery succeeded
+    if (totalSuccessCount > 0) {
+      await notifiedDocRef.set({ sentAt: new Date().toISOString() });
+      notificationsSent++;
+    }
   }
 
   // Cleanup stale tokens from Firestore

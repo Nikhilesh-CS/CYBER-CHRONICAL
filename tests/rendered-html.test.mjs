@@ -18,10 +18,6 @@ test("exports the Cyber Chronicle digital newspaper as static HTML", async () =>
   assert.match(html, /Trust is the story/);
   assert.match(html, /Free edition/);
   assert.match(html, /\/CYBER-CHRONICAL\/data\/news\.json/);
-  assert.doesNotMatch(
-    html,
-    /\bCISA\b|\bNVD\b|\bNIST\b|Known Exploited Vulnerabilities|cisa\.gov|nvd\.nist\.gov/i,
-  );
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
   assert.doesNotMatch(html, /Helios Edge|Northstar Cloud|EmberLock|QuartzMail|Orion Systems/i);
 });

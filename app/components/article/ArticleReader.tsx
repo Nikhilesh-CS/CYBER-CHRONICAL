@@ -92,6 +92,14 @@ export function ArticleReader({ item, saved, onSave, onClose }: {
               <p><Clock3 size={16} />The story was last updated from source evidence on {formatDate(item.updatedAt, true)} IST.</p>
             </div>
             {item.unknowns.length > 0 && <div className="developing-note"><strong>Still developing</strong>{item.unknowns.map((unknown) => <p key={unknown}>{unknown}</p>)}</div>}
+            {item.metadata.type === "cyber" && (
+              <div className="cyber-metadata">
+                {item.metadata.severity && <p><strong>Severity:</strong> {item.metadata.severity}</p>}
+                {item.metadata.identifier && <p><strong>Identifier:</strong> {item.metadata.identifier}</p>}
+                {item.metadata.affected && <p><strong>Affected:</strong> {item.metadata.affected}</p>}
+                {item.metadata.action && <p><strong>Action:</strong> {item.metadata.action}</p>}
+              </div>
+            )}
           </section>
 
           <section className="article-block">

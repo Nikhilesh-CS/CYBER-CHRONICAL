@@ -45,11 +45,11 @@ test("returns only official CERT-In India records with explicit attribution", as
 
   assert.equal(payload.state, "fresh");
   assert.equal(payload.items.length, 2);
-  assert.deepEqual(payload.items.map((item) => item.source).sort(), ["CERT-In Advisory", "CERT-In Vulnerability Note"]);
-  assert.deepEqual(payload.items.map((item) => item.identifier).sort(), ["CIAD-2026-0036", "CIVN-2026-0375"]);
-  assert.match(payload.items.find((item) => item.identifier === "CIVN-2026-0375").title, /BeyondTrust & Products/);
+  assert.deepEqual(payload.items.map((item) => item.primaryPublisher).sort(), ["CERT-In", "CERT-In"]);
+  assert.deepEqual(payload.items.map((item) => item.metadata?.identifier).sort(), ["CIAD-2026-0036", "CIVN-2026-0375"]);
+  assert.match(payload.items.find((item) => item.metadata?.identifier === "CIVN-2026-0375").title, /BeyondTrust & Products/);
   assert.ok(payload.items.every((item) => item.summary === "Official CERT-In metadata record. Open the source link for complete technical details and guidance."));
-  assert.ok(payload.items.every((item) => item.severity === "Unknown"));
+  assert.ok(payload.items.every((item) => item.metadata?.severity === "Unknown"));
   assert.ok(payload.items.every((item) => item.references[0].startsWith("https://www.cert-in.org.in/")));
   assert.ok(payload.sources.every((source) => source.authority.includes("Government of India")));
   assert.ok(payload.sources.every((source) => source.url.startsWith("https://www.cert-in.org.in/")));
@@ -113,7 +113,7 @@ test("fails visibly when a newly listed CERT-In record has incomplete metadata",
 
   assert.equal(payload.state, "partial");
   assert.equal(payload.sources.find((source) => source.id === "cert-in-advisories").status, "failed");
-  assert.ok(payload.items.every((item) => item.source === "CERT-In Vulnerability Note"));
+  assert.ok(payload.items.every((item) => item.primaryPublisher === "CERT-In"));
 });
 
 test("reports partial data and never invents a failed source record", async () => {
@@ -125,7 +125,7 @@ test("reports partial data and never invents a failed source record", async () =
 
   assert.equal(payload.state, "partial");
   assert.equal(payload.items.length, 1);
-  assert.equal(payload.items[0].source, "CERT-In Advisory");
+  assert.equal(payload.items[0].primaryPublisher, "CERT-In");
   assert.equal(payload.sources.find((source) => source.id === "cert-in-vulnerability-notes").status, "failed");
 });
 

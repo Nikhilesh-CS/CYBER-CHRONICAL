@@ -102,31 +102,40 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-/* ---- Push Notifications ---- */
-self.addEventListener("push", (event) => {
-  if (!event.data) return;
-  let data;
-  try {
-    data = event.data.json();
-  } catch {
-    data = { title: "Cyber Chronicle", body: event.data.text() };
-  }
-  event.waitUntil(
+/* ---- Firebase Cloud Messaging Background Push ---- */
+importScripts("https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js");
+
+const url = new URL(location);
+const apiKey = url.searchParams.get("apiKey");
+if (apiKey) {
+  firebase.initializeApp({
+    apiKey: url.searchParams.get("apiKey"),
+    projectId: url.searchParams.get("projectId"),
+    messagingSenderId: url.searchParams.get("messagingSenderId"),
+    appId: url.searchParams.get("appId"),
+  });
+  const messaging = firebase.messaging();
+  
+  messaging.onBackgroundMessage((payload) => {
+    if (!payload.data) return;
+    const data = payload.data;
+    
     self.registration.showNotification(data.title || "Cyber Chronicle Alert", {
       body: data.body || "A new security alert has been published.",
       icon: data.icon || "/CYBER-CHRONICAL/app-icon-192.png",
       badge: "/CYBER-CHRONICAL/app-icon-192.png",
-      tag: data.tag || "cyber-chronicle-alert",
-      renotify: !!data.tag,
+      tag: data.storyId || "cyber-chronicle-alert",
+      renotify: !!data.storyId,
       data: { url: data.url || "/CYBER-CHRONICAL/" },
       vibrate: [100, 50, 100],
       actions: [
         { action: "read", title: "Read now" },
         { action: "dismiss", title: "Dismiss" },
       ],
-    }),
-  );
-});
+    });
+  });
+}
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
@@ -136,6 +145,7 @@ self.addEventListener("notificationclick", (event) => {
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
         if (client.url.includes("CYBER-CHRONICAL") && "focus" in client) {
+          client.postMessage({ type: "NAVIGATE", url: targetUrl });
           return client.focus();
         }
       }

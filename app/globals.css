@@ -150,6 +150,8 @@ a { color: inherit; }
 .art-world-cyber-news { background: linear-gradient(135deg, #123438, #177b75 58%, #7cc5ba); }
 .card-copy { position: relative; z-index: 3; pointer-events: none; }
 .card-kicker { display: flex; align-items: center; justify-content: space-between; color: var(--brand); font-size: 8px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+.category-chips { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.category-chip { background: rgba(56, 126, 255, 0.1); padding: 2px 6px; border-radius: 4px; }
 .save-story { position: relative; z-index: 4; display: grid; place-items: center; padding: 4px; border: 0; background: transparent; color: var(--muted); cursor: pointer; pointer-events: auto; }
 .save-story:hover { color: var(--brand); }
 .news-card h3 { margin: 10px 0 8px; font-family: Georgia, serif; font-size: 19px; line-height: 1.2; }
