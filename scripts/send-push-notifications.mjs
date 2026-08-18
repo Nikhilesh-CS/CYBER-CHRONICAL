@@ -18,9 +18,6 @@ import { getMessaging } from "firebase-admin/messaging";
 
 const FIREBASE_SERVICE_ACCOUNT = process.env.FIREBASE_SERVICE_ACCOUNT;
 const NEWS_PATH = resolve("public/data/news.json");
-const SENT_PATH = resolve("public/data/.last-notified.json");
-const BATCH_SIZE = 500; // Firebase allows max 500 tokens per multicast send
-
 async function readJson(path) {
   try {
     return JSON.parse(await readFile(path, "utf8"));
@@ -41,19 +38,16 @@ async function main() {
     return;
   }
 
-  const lastNotified = await readJson(SENT_PATH);
-  const alreadySent = new Set(lastNotified?.ids ?? []);
-
-  /* Find new official or high-confidence stories that haven't been notified yet */
-  const newAlerts = edition.items.filter((item) =>
-    !alreadySent.has(item.id) && (
+  /* Filter for official or high-confidence stories */
+  const potentialAlerts = edition.items.filter((item) =>
+    (
       item.sourceCategory === "official" ||
       item.verificationStatus === "corroborated" ||
       item.confidence === "High"
-    ),
-  ).slice(0, 5); /* Limit to 5 notifications per run */
+    )
+  );
 
-  if (newAlerts.length === 0) {
+  if (potentialAlerts.length === 0) {
     console.log("No new critical alerts to notify about.");
     return;
   }
@@ -79,102 +73,112 @@ async function main() {
 
   const db = getFirestore();
   
-  // Fetch active FIDs
+  // Fetch active FIDs (now fcmTokens)
   console.log("Fetching active subscribers from Firestore...");
   const subscribersSnapshot = await db.collection("subscribers").where("enabled", "==", true).get();
   
   const activeSubscribers = [];
   subscribersSnapshot.forEach((doc) => {
     const data = doc.data();
-    if (data.fid) {
-      activeSubscribers.push({ uid: doc.id, fid: data.fid });
+    if (data.fcmToken) {
+      activeSubscribers.push({ uid: doc.id, fcmToken: data.fcmToken });
     }
   });
 
-  const fids = activeSubscribers.map(sub => sub.fid);
+  const tokens = activeSubscribers.map(sub => sub.fcmToken);
 
-  if (fids.length === 0) {
+  if (tokens.length === 0) {
     console.log("No active subscribers found. Skipping push send.");
-  } else {
-    console.log(`Found ${fids.length} active subscriber(s). Sending ${newAlerts.length} notification(s)…`);
+    return;
+  } 
 
-    const invalidUidsToDelete = new Set();
+  console.log(`Found ${tokens.length} active subscriber(s). Checking ${potentialAlerts.length} potential alert(s)…`);
 
-    for (const alert of newAlerts) {
-      const title = alert.title.replace(`${alert.identifier}: `, "");
-      const body = alert.studentSummary || `New ${alert.sourceCategory} update from ${alert.primaryPublisher}`;
+  let notificationsSent = 0;
+  const invalidUidsToDelete = new Set();
 
-      const messageTemplate = {
+  for (const alert of potentialAlerts) {
+    if (notificationsSent >= 5) break; // Limit to 5 per run
+
+    // Check if we've already notified for this story
+    const notifiedDocRef = db.collection("notifiedStories").doc(alert.id);
+    const notifiedDoc = await notifiedDocRef.get();
+    
+    if (notifiedDoc.exists) {
+      continue;
+    }
+
+    const title = alert.title.replace(`${alert.identifier}: `, "");
+    const body = alert.studentSummary || `New ${alert.sourceCategory} update from ${alert.primaryPublisher}`;
+
+    const messageTemplate = {
+      notification: {
+        title: `⚠️ ${title}`,
+        body,
+      },
+      data: {
+        title,
+        body,
+        tag: alert.id,
+        url: "/CYBER-CHRONICAL/",
+      },
+      webpush: {
         notification: {
-          title: `⚠️ ${title}`,
-          body,
-        },
-        data: {
-          title,
-          body,
-          tag: alert.id,
-          url: "/CYBER-CHRONICAL/",
-        },
-        webpush: {
-          notification: {
-            icon: "/CYBER-CHRONICAL/app-icon-192.png",
-            click_action: "/CYBER-CHRONICAL/",
-          }
-        }
-      };
-
-      // Batch send to a maximum of 500 FIDs per request
-      for (let i = 0; i < fids.length; i += BATCH_SIZE) {
-        const fidsBatch = fids.slice(i, i + BATCH_SIZE);
-        const uidsBatch = activeSubscribers.slice(i, i + BATCH_SIZE).map(sub => sub.uid);
-
-        try {
-          const response = await getMessaging().sendEachForMulticast({
-            ...messageTemplate,
-            tokens: fidsBatch, // Firebase Admin API still uses 'tokens' field for FIDs in sendEachForMulticast
-          });
-
-          console.log(`  ✓ Notified batch of ${fidsBatch.length}: ${title.slice(0, 60)}…`);
-          console.log(`    Success: ${response.successCount}, Failed: ${response.failureCount}`);
-
-          // Cleanup stale/unregistered FIDs
-          if (response.failureCount > 0) {
-            response.responses.forEach((resp, idx) => {
-              if (!resp.success) {
-                const errorCode = resp.error?.code;
-                if (errorCode === 'messaging/invalid-registration-token' || errorCode === 'messaging/registration-token-not-registered') {
-                  invalidUidsToDelete.add(uidsBatch[idx]);
-                }
-              }
-            });
-          }
-        } catch (error) {
-          console.warn(`  ✗ Batch Error: ${error instanceof Error ? error.message : String(error)}`);
+          icon: "/CYBER-CHRONICAL/app-icon-192.png",
+          click_action: "/CYBER-CHRONICAL/",
         }
       }
-    }
+    };
 
-    // Cleanup stale tokens from Firestore
-    if (invalidUidsToDelete.size > 0) {
-      console.log(`Cleaning up ${invalidUidsToDelete.size} invalid subscriber(s) from Firestore...`);
-      const batch = db.batch();
-      for (const uid of invalidUidsToDelete) {
-        batch.delete(db.collection("subscribers").doc(uid));
-      }
+    // Batch send to a maximum of 500 tokens per request
+    for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
+      const tokensBatch = tokens.slice(i, i + BATCH_SIZE);
+      const uidsBatch = activeSubscribers.slice(i, i + BATCH_SIZE).map(sub => sub.uid);
+
       try {
-        await batch.commit();
-        console.log("Cleanup complete.");
-      } catch (err) {
-        console.warn("Failed to delete some invalid tokens from Firestore", err);
+        const response = await getMessaging().sendEachForMulticast({
+          ...messageTemplate,
+          tokens: tokensBatch,
+        });
+
+        console.log(`  ✓ Notified batch of ${tokensBatch.length}: ${title.slice(0, 60)}…`);
+        console.log(`    Success: ${response.successCount}, Failed: ${response.failureCount}`);
+
+        // Cleanup stale/unregistered tokens
+        if (response.failureCount > 0) {
+          response.responses.forEach((resp, idx) => {
+            if (!resp.success) {
+              const errorCode = resp.error?.code;
+              if (errorCode === 'messaging/invalid-registration-token' || errorCode === 'messaging/registration-token-not-registered') {
+                invalidUidsToDelete.add(uidsBatch[idx]);
+              }
+            }
+          });
+        }
+      } catch (error) {
+        console.warn(`  ✗ Batch Error: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
+
+    // Mark as notified
+    await notifiedDocRef.set({ sentAt: new Date().toISOString() });
+    notificationsSent++;
   }
 
-  /* Remember which alerts were notified so we don't re-send them */
-  const allSentIds = [...alreadySent, ...newAlerts.map((a) => a.id)].slice(-200);
-  await mkdir(dirname(SENT_PATH), { recursive: true });
-  await writeFile(SENT_PATH, JSON.stringify({ ids: allSentIds, lastRun: new Date().toISOString() }), "utf8");
-  console.log(`Tracking updated. ${allSentIds.length} IDs tracked.`);
+  // Cleanup stale tokens from Firestore
+  if (invalidUidsToDelete.size > 0) {
+    console.log(`Cleaning up ${invalidUidsToDelete.size} invalid subscriber(s) from Firestore...`);
+    const batch = db.batch();
+    for (const uid of invalidUidsToDelete) {
+      batch.delete(db.collection("subscribers").doc(uid));
+    }
+    try {
+      await batch.commit();
+      console.log("Cleanup complete.");
+    } catch (err) {
+      console.warn("Failed to delete some invalid tokens from Firestore", err);
+    }
+  }
 }
 
 main().catch((error) => {

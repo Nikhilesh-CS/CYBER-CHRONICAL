@@ -4,7 +4,7 @@ import { Bell, BellOff, Check, Download } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { signInAnonymously } from "firebase/auth";
 import { doc, setDoc, deleteDoc } from "firebase/firestore";
-import { register, unregister, onRegistered, onUnregistered } from "firebase/messaging";
+import { getToken, deleteToken, onMessage } from "firebase/messaging";
 import { auth, db, messaging } from "../../../lib/firebase";
 
 type NotificationState = "default" | "granted" | "denied" | "unsupported" | "needs-install";
@@ -47,23 +47,23 @@ export function NotificationManager() {
         const userCredential = await signInAnonymously(auth);
         const uid = userCredential.user.uid;
 
-        // 2. Listen for FID registration success and write to Firestore
-        onRegistered(messaging, async (fid) => {
+        // 2. Register the service worker and get FCM token
+        const swReg = await navigator.serviceWorker.ready;
+        const currentToken = await getToken(messaging, {
+          vapidKey: process.env.NEXT_PUBLIC_VAPID_KEY,
+          serviceWorkerRegistration: swReg,
+        });
+
+        if (currentToken) {
+          // 3. Write to Firestore
           const docRef = doc(db!, "subscribers", uid);
           await setDoc(docRef, {
-            fid,
+            fcmToken: currentToken,
             enabled: true,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           }, { merge: true });
-        });
-
-        // 3. Register the service worker with Firebase Messaging
-        const swReg = await navigator.serviceWorker.ready;
-        await register(messaging, {
-          vapidKey: process.env.NEXT_PUBLIC_VAPID_KEY,
-          serviceWorkerRegistration: swReg,
-        });
+        }
       }
     } catch (err) {
       console.error("Push subscription failed", err);
@@ -80,14 +80,12 @@ export function NotificationManager() {
       const userCredential = await signInAnonymously(auth);
       const uid = userCredential.user.uid;
 
-      // 2. Listen for FID unregistration and remove from Firestore
-      onUnregistered(messaging, async (fid) => {
-        const docRef = doc(db!, "subscribers", uid);
-        await deleteDoc(docRef);
-      });
+      // 2. Remove from Firestore
+      const docRef = doc(db!, "subscribers", uid);
+      await deleteDoc(docRef);
 
-      // 3. Unregister the FID
-      await unregister(messaging);
+      // 3. Delete the token
+      await deleteToken(messaging);
       setState("default");
     } catch (err) {
       console.error("Unsubscribe failed", err);
