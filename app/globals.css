@@ -360,3 +360,205 @@ a { color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; animation-duration: .01ms !important; }
 }
+
+/* ========================================
+   MOBILE APP SHELL
+   ======================================== */
+
+/* Bottom Tab Bar */
+.mobile-tab-bar { display: none; }
+
+@media (max-width: 760px) {
+  .mobile-tab-bar {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 90;
+    display: flex; align-items: stretch; justify-content: space-around;
+    min-height: 60px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    border-top: 1px solid var(--line);
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  }
+  .mobile-tab-bar button {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    padding: 8px 0 6px; border: 0; background: transparent;
+    color: var(--muted); font-size: 9px; font-weight: 600; cursor: pointer;
+    transition: color .15s;
+  }
+  .mobile-tab-bar button.tab-active { color: var(--brand); }
+  .tab-icon-wrap { position: relative; display: flex; align-items: center; justify-content: center; }
+  .tab-badge {
+    position: absolute; top: -6px; right: -10px;
+    min-width: 16px; height: 16px; padding: 0 4px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 8px; background: var(--breaking); color: #fff;
+    font-size: 8px; font-weight: 800; line-height: 1;
+  }
+  .publication-shell { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
+  .site-footer { margin-bottom: 0; }
+}
+
+/* Pull to Refresh */
+.pull-to-refresh-container { position: relative; }
+.pull-indicator {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  overflow: hidden; color: var(--brand); font-size: 11px; font-weight: 600;
+  transition: height .2s ease;
+}
+.pull-indicator.pull-ready { color: var(--brand-deep); }
+.pull-indicator.pull-refreshing { color: var(--brand); }
+
+/* Offline Banner */
+.offline-banner {
+  position: sticky; top: 0; z-index: 95;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 32px; padding: 6px 14px;
+  background: var(--warning); color: #fff;
+  font-size: 11px; font-weight: 600;
+}
+
+/* ========================================
+   SETTINGS VIEW
+   ======================================== */
+.settings-view { max-width: 680px; margin: auto; padding: 30px 24px 50px; }
+.settings-header { padding-bottom: 24px; border-bottom: 2px solid var(--ink); }
+.settings-header h1 { margin: 0; font-family: Georgia, serif; font-size: 32px; }
+.settings-header small { color: var(--muted); font-size: 11px; }
+.settings-group { padding-top: 28px; }
+.settings-group > strong { display: block; margin-bottom: 12px; color: var(--brand); font-size: 9px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }
+.settings-row {
+  width: 100%; min-height: 64px; padding: 14px 0;
+  display: flex; align-items: center; gap: 14px;
+  border: 0; border-bottom: 1px solid var(--line); background: transparent;
+  text-align: left; cursor: pointer; color: inherit;
+}
+.settings-row > span { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 10px; background: var(--surface-soft); color: var(--brand); flex: 0 0 auto; }
+.settings-row > div { flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.settings-row strong { font-size: 13px; }
+.settings-row small { color: var(--muted); font-size: 10px; }
+.settings-info { cursor: default; }
+
+/* Notification Settings */
+.notification-setting {
+  display: flex; align-items: center; gap: 14px;
+  min-height: 64px; padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.notification-info { flex: 1; display: flex; align-items: center; gap: 12px; }
+.notification-info > svg { color: var(--brand); flex: 0 0 auto; }
+.notification-info > div { display: flex; flex-direction: column; gap: 3px; }
+.notification-info strong { font-size: 13px; }
+.notification-info small { color: var(--muted); font-size: 10px; }
+.notification-actions { display: flex; align-items: center; gap: 10px; }
+.notification-active { display: flex; align-items: center; gap: 5px; color: #2eaa68; font-size: 10px; font-weight: 700; }
+.notification-off-btn { display: flex; align-items: center; gap: 5px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; }
+.notification-enable-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: 0; border-radius: 8px; background: var(--brand); color: #fff; font-size: 11px; font-weight: 600; cursor: pointer; }
+.notification-enable-btn:disabled { opacity: .6; cursor: wait; }
+.notification-blocked { color: var(--muted); font-size: 9px; }
+
+/* ========================================
+   SAVED VIEW
+   ======================================== */
+.saved-view { max-width: 780px; margin: auto; padding: 30px 24px 50px; }
+.saved-header { padding-bottom: 24px; border-bottom: 2px solid var(--ink); }
+.saved-header h1 { margin: 0; font-family: Georgia, serif; font-size: 32px; }
+.saved-header small { color: var(--muted); font-size: 11px; }
+.saved-empty { padding: 60px 0; text-align: center; color: var(--muted); }
+.saved-empty svg { margin-bottom: 16px; opacity: .3; }
+.saved-empty h2 { margin: 0 0 8px; font-family: Georgia, serif; font-size: 22px; color: var(--ink-soft); }
+.saved-empty p { max-width: 300px; margin: 0 auto; font-size: 12px; line-height: 1.5; }
+.saved-list .news-card { border-bottom: 1px solid var(--line); }
+
+/* ========================================
+   SEARCH VIEW
+   ======================================== */
+.search-view { max-width: 780px; margin: auto; padding: 30px 24px 50px; }
+.search-view-header { padding-bottom: 24px; border-bottom: 2px solid var(--ink); }
+.search-view-header h1 { margin: 0 0 16px; font-family: Georgia, serif; font-size: 32px; }
+.search-view-input {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 14px; height: 48px;
+  border: 1px solid var(--line-dark); border-radius: 10px;
+  background: var(--surface); color: var(--muted);
+  transition: border-color .15s;
+}
+.search-view-input:focus-within { border-color: var(--brand); color: var(--brand); }
+.search-view-input input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 14px; }
+.search-view-input button { display: grid; place-items: center; padding: 4px; border: 0; background: transparent; cursor: pointer; color: var(--muted); }
+.search-results { padding-top: 18px; }
+.search-results > small { display: block; margin-bottom: 14px; color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+.search-no-results { padding: 40px 0; text-align: center; color: var(--muted); font-family: Georgia, serif; font-size: 15px; }
+.search-suggestions { padding-top: 24px; }
+.search-suggestions > strong { display: block; margin-bottom: 12px; color: var(--brand); font-size: 9px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }
+.search-suggestions button {
+  width: 100%; min-height: 52px; padding: 12px 0;
+  display: flex; align-items: center; gap: 12px;
+  border: 0; border-bottom: 1px solid var(--line); background: transparent;
+  text-align: left; cursor: pointer; color: inherit;
+}
+.search-suggestions button span { flex: 1; font-family: Georgia, serif; font-size: 15px; font-weight: 700; }
+.search-suggestions button em { color: var(--muted); font-size: 10px; font-style: normal; }
+.search-suggestions button:hover span { color: var(--brand); }
+
+/* ========================================
+   ALERTS VIEW
+   ======================================== */
+.alerts-view { max-width: 780px; margin: auto; padding: 30px 24px 50px; }
+.alerts-view-header { padding-bottom: 24px; border-bottom: 2px solid var(--ink); }
+.alerts-view-header h1 { margin: 0; font-family: Georgia, serif; font-size: 32px; }
+.alerts-view-header small { color: var(--breaking); font-size: 11px; font-weight: 700; }
+.alerts-full-list { border-top: 1px solid var(--line); }
+.alerts-full-list .alert-news-item { width: 100%; border-right: 0; padding: 20px 0; }
+
+/* ========================================
+   SHARE BUTTON
+   ======================================== */
+.share-button-icon {
+  display: grid; place-items: center; padding: 6px;
+  border: 0; background: transparent; color: var(--muted); cursor: pointer;
+  transition: color .15s;
+}
+.share-button-icon:hover { color: var(--brand); }
+.share-button-full {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; max-width: 280px; margin: auto;
+  padding: 12px 20px; border: 1px solid var(--brand); border-radius: 8px;
+  background: transparent; color: var(--brand);
+  font-size: 12px; font-weight: 650; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.share-button-full:hover { background: var(--brand); color: #fff; }
+.article-share-cta { padding: 30px 0; text-align: center; }
+
+/* Article toolbar actions */
+.toolbar-actions { display: flex; align-items: center; gap: 4px; }
+
+/* ========================================
+   TOUCH OPTIMIZATIONS
+   ======================================== */
+@media (hover: none) and (pointer: coarse) {
+  button, a { touch-action: manipulation; }
+  .top-story, .alert-news-item, .news-card, .trend-list button,
+  .editors-picks > button, .weekly-highlights button, .daily-briefing li button,
+  .search-suggestions button, .settings-row {
+    min-height: 48px;
+  }
+}
+
+/* ========================================
+   SAFE AREAS (PWA standalone mode)
+   ======================================== */
+@supports (padding: env(safe-area-inset-top)) {
+  .site-header { padding-top: env(safe-area-inset-top); }
+  @media (display-mode: standalone) {
+    .utility-bar { min-height: calc(34px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }
+  }
+}
+
+/* ========================================
+   APP SPLASH / STANDALONE TWEAKS
+   ======================================== */
+@media (display-mode: standalone) {
+  .utility-bar > span:first-child { display: none; }
+  .site-footer { display: none; }
+}
+
