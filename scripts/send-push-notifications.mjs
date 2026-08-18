@@ -101,7 +101,8 @@ async function main() {
     if (notificationsSent >= 5) break; // Limit to 5 per run
 
     // Check if we've already notified for this story
-    const notifiedDocRef = db.collection("notifiedStories").doc(alert.id);
+    const safeDocId = encodeURIComponent(alert.id);
+    const notifiedDocRef = db.collection("notifiedStories").doc(safeDocId);
     const notifiedDoc = await notifiedDocRef.get();
     
     if (notifiedDoc.exists) {
