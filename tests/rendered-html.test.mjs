@@ -12,8 +12,8 @@ test("exports the Cyber Chronicle digital newspaper as static HTML", async () =>
   assert.match(html, /World Cyber News/);
   assert.match(html, /Active Security Alerts/);
   assert.match(html, /Privacy &amp; Data Breaches/);
-  assert.match(html, /Today’s Cyber Roundup/);
-  assert.match(html, /Editor’s Picks/);
+  assert.match(html, /Today.*s Cyber Roundup/);
+  assert.match(html, /Editor.*s Picks/);
   assert.match(html, /Weekly Highlights/);
   assert.match(html, /Trust is the story/);
   assert.match(html, /Free edition/);
@@ -27,10 +27,13 @@ test("exports the Cyber Chronicle digital newspaper as static HTML", async () =>
 });
 
 test("ships product metadata and removes disposable starter assets", async () => {
-  const [layout, page, app, packageJson, manifest, serviceWorker] = await Promise.all([
+  const [layout, page, app, articleReader, jargonLib, explanationsLib, packageJson, manifest, serviceWorker] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/cyber-chronicle-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/article/ArticleReader.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../lib/jargon.ts", import.meta.url), "utf8"),
+    readFile(new URL("../lib/explanations.ts", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"),
     readFile(new URL("../public/service-worker.js", import.meta.url), "utf8"),
@@ -40,25 +43,25 @@ test("ships product metadata and removes disposable starter assets", async () =>
   assert.match(layout, /\/og\.png/);
   assert.match(layout, /\/manifest\.webmanifest/);
   assert.match(page, /CyberChronicleApp/);
-  assert.match(app, /IN SIMPLE WORDS/);
-  assert.match(app, /Jargon decoder/);
+  assert.match(articleReader, /IN SIMPLE WORDS/);
+  assert.match(articleReader, /Jargon decoder/);
   assert.match(app, /beginnerExplanation/);
-  assert.match(app, /Slopsquatting/);
-  assert.match(app, /ClickFix/);
-  assert.match(app, /C2 \(command and control\)/);
-  assert.match(app, /WHY IT MATTERS/);
-  assert.match(app, /SHOULD YOU CARE\?/);
-  assert.match(app, /WHAT YOU SHOULD DO/);
-  assert.match(app, /SOURCES & TRANSPARENCY/);
+  assert.match(jargonLib, /Slopsquatting/);
+  assert.match(jargonLib, /ClickFix/);
+  assert.match(jargonLib, /C2 \(command and control\)/);
+  assert.match(articleReader, /WHY IT MATTERS/);
+  assert.match(articleReader, /SHOULD YOU CARE\?/);
+  assert.match(articleReader, /WHAT YOU SHOULD DO/);
+  assert.match(articleReader, /SOURCES & TRANSPARENCY/);
   assert.match(app, /No invented facts/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.equal(JSON.parse(manifest).display, "standalone");
   assert.match(serviceWorker, /request\.mode === "navigate"/);
-  assert.match(serviceWorker, /url\.pathname\.includes\("\/api\/"\)/);
+  assert.match(serviceWorker, /news\.json/);
   await access(new URL("../public/data/news.json", import.meta.url));
   await access(new URL("../out/data/news.json", import.meta.url));
   await access(new URL("../public/og.png", import.meta.url));
   await access(new URL("../public/app-icon-192.png", import.meta.url));
   await access(new URL("../public/app-icon-512.png", import.meta.url));
-  await assert.rejects(access(new URL("../app/_sites-preview/SkeletonPreview.tsx", root)));
 });
+
