@@ -464,21 +464,47 @@ img.article-hero-image { display: block; width: calc(100% + 120px); height: 280p
 
 /* Notification Settings */
 .notification-setting {
-  display: flex; align-items: center; gap: 14px;
+  display: flex; flex-direction: column; gap: 14px;
   min-height: 64px; padding: 14px 0;
   border-bottom: 1px solid var(--line);
 }
-.notification-info { flex: 1; display: flex; align-items: center; gap: 12px; }
+.notification-header-row {
+  display: flex; align-items: center; gap: 14px; width: 100%; min-width: 0;
+  flex-wrap: wrap;
+}
+.notification-info { flex: 1; min-width: 200px; display: flex; align-items: center; gap: 12px; }
 .notification-info > svg { color: var(--brand); flex: 0 0 auto; }
 .notification-info > div { display: flex; flex-direction: column; gap: 3px; }
 .notification-info strong { font-size: 13px; }
 .notification-info small { color: var(--muted); font-size: 10px; }
-.notification-actions { display: flex; align-items: center; gap: 10px; }
+.notification-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .notification-active { display: flex; align-items: center; gap: 5px; color: #2eaa68; font-size: 10px; font-weight: 700; }
-.notification-off-btn { display: flex; align-items: center; gap: 5px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; }
-.notification-enable-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: 0; border-radius: 8px; background: var(--brand); color: #fff; font-size: 11px; font-weight: 600; cursor: pointer; }
+.notification-off-btn { display: flex; align-items: center; gap: 5px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; flex: 0 0 auto; }
+.notification-enable-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: 0; border-radius: 8px; background: var(--brand); color: #fff; font-size: 11px; font-weight: 600; cursor: pointer; flex: 0 0 auto; }
 .notification-enable-btn:disabled { opacity: .6; cursor: wait; }
 .notification-blocked { color: var(--muted); font-size: 9px; }
+.notification-preferences { width: 100%; background: var(--surface-soft); padding: 16px; border-radius: 8px; }
+.notification-preferences label { width: 100%; white-space: normal; }
+
+/* Settings Pages */
+.settings-page { max-width: 680px; margin: auto; padding: 20px 24px 50px; }
+.settings-nav-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+.settings-nav-header button { display: flex; align-items: center; gap: 4px; border: none; background: transparent; color: var(--brand); font-size: 12px; font-weight: 600; cursor: pointer; padding: 0; }
+.settings-nav-header h1 { margin: 0; font-family: Georgia, serif; font-size: 24px; }
+.settings-page-content { display: flex; flex-direction: column; gap: 24px; }
+.settings-info-block { background: var(--surface-soft); padding: 16px; border-radius: 8px; font-size: 13px; line-height: 1.5; color: var(--ink-soft); }
+.settings-info-block p { margin: 0 0 12px; }
+.settings-info-block p:last-child { margin: 0; }
+.settings-source-group { margin-bottom: 24px; }
+.settings-source-group h3 { font-size: 10px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--brand); border-bottom: 1px solid var(--line); padding-bottom: 6px; margin-bottom: 12px; }
+.settings-source-item { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--line-light); }
+.settings-source-item:last-child { border-bottom: none; }
+.settings-source-item strong { font-size: 13px; }
+.settings-source-item span { font-size: 11px; color: var(--muted); }
+.settings-source-meta { display: flex; align-items: center; gap: 8px; }
+.settings-source-live { display: flex; align-items: center; gap: 4px; color: #2eaa68; font-size: 10px; font-weight: 600; }
+.settings-source-live.offline { color: var(--muted); }
+.settings-source-live i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
 /* ========================================
    SAVED VIEW

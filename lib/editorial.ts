@@ -219,3 +219,39 @@ export function practicalActions(item: RealIntelligenceItem) {
     "Keep devices updated and remain cautious of messages that exploit breaking news.",
   ];
 }
+
+export type SourceGroup =
+  | "OFFICIAL / GOVERNMENT"
+  | "THREAT INTELLIGENCE & SECURITY RESEARCH"
+  | "CYBERSECURITY NEWS"
+  | "TECHNOLOGY & AI"
+  | "SCIENCE & SPACE"
+  | "WORLD / GENERAL NEWS";
+
+export function computeSourceGroup(source: { trustTier: number; authority: string; categories: string[]; name: string }): SourceGroup {
+  const auth = source.authority.toLowerCase();
+  const name = source.name.toLowerCase();
+  const cats = source.categories || [];
+
+  if (source.trustTier === 1 || auth.includes("government") || auth.includes("official authority")) {
+    return "OFFICIAL / GOVERNMENT";
+  }
+
+  if (cats.includes("cyber") && (auth.includes("research") || auth.includes("intelligence") || auth.includes("security") || name.includes("research") || name.includes("intelligence") || name.includes("labs"))) {
+    return "THREAT INTELLIGENCE & SECURITY RESEARCH";
+  }
+
+  if (cats.includes("cyber")) {
+    return "CYBERSECURITY NEWS";
+  }
+
+  if (cats.includes("technology") || cats.includes("ai")) {
+    return "TECHNOLOGY & AI";
+  }
+
+  if (cats.includes("science") || cats.includes("space")) {
+    return "SCIENCE & SPACE";
+  }
+
+  return "WORLD / GENERAL NEWS";
+}

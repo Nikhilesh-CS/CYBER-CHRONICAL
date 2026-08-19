@@ -151,58 +151,58 @@ export function NotificationManager() {
 
   return (
     <div className="notification-setting">
-      <div className="notification-info">
-        <Bell size={20} />
-        <div>
-          <strong>Push Notifications</strong>
-          <small>
-            {state === "granted"
-              ? "You'll receive alerts based on your preferences"
-              : state === "denied"
-                ? "Notifications are blocked in your browser settings"
-                : "Get notified when critical security alerts are published"}
-          </small>
+      <div className="notification-header-row">
+        <div className="notification-info">
+          <Bell size={20} />
+          <div>
+            <strong>Push Notifications</strong>
+            <small>
+              {state === "granted"
+                ? "You'll receive alerts based on your preferences"
+                : state === "denied"
+                  ? "Notifications are blocked in your browser settings"
+                  : "Get notified when critical security alerts are published"}
+            </small>
+          </div>
         </div>
-      </div>
-      {state === "granted" ? (
-        <>
+        {state === "granted" ? (
           <div className="notification-actions">
             <span className="notification-active"><Check size={14} />Active</span>
             <button onClick={() => setShowSettings(!showSettings)} className="notification-off-btn"><Settings2 size={14} />Settings</button>
             <button onClick={unsubscribe} className="notification-off-btn"><BellOff size={14} />Turn off</button>
           </div>
-          {showSettings && (
-            <div className="notification-preferences">
-              <strong style={{ display: 'block', marginBottom: '12px', fontSize: '14px', marginTop: '16px' }}>Notification Preferences</strong>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {[
-                  { key: "criticalAlerts", label: "Critical Alerts" },
-                  { key: "highSeverityAlerts", label: "High Severity Alerts" },
-                  { key: "officialAdvisories", label: "Official Advisories" },
-                  { key: "dataBreaches", label: "Data Breaches" },
-                  { key: "threatIntelligence", label: "Threat Intelligence" },
-                  { key: "aiTechUpdates", label: "AI & Technology Updates" },
-                  { key: "generalNews", label: "General News" },
-                ].map(({ key, label }) => (
-                  <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px' }}>
-                    <input 
-                      type="checkbox" 
-                      checked={preferences[key as keyof typeof preferences]} 
-                      onChange={(e) => updatePreference(key as keyof typeof preferences, e.target.checked)} 
-                    />
-                    <span>{label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      ) : state !== "denied" ? (
-        <button onClick={subscribe} disabled={subscribing} className="notification-enable-btn">
-          <Bell size={14} />{subscribing ? "Enabling…" : "Enable"}
-        </button>
-      ) : (
-        <small className="notification-blocked">Unblock in browser settings</small>
+        ) : state !== "denied" ? (
+          <button onClick={subscribe} disabled={subscribing} className="notification-enable-btn">
+            <Bell size={14} />{subscribing ? "Enabling…" : "Enable"}
+          </button>
+        ) : (
+          <small className="notification-blocked">Unblock in browser settings</small>
+        )}
+      </div>
+      {state === "granted" && showSettings && (
+        <div className="notification-preferences">
+          <strong style={{ display: 'block', marginBottom: '12px', fontSize: '14px', marginTop: '16px' }}>Notification Preferences</strong>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {[
+              { key: "criticalAlerts", label: "Critical Alerts" },
+              { key: "highSeverityAlerts", label: "High Severity Alerts" },
+              { key: "officialAdvisories", label: "Official Advisories" },
+              { key: "dataBreaches", label: "Data Breaches" },
+              { key: "threatIntelligence", label: "Threat Intelligence" },
+              { key: "aiTechUpdates", label: "AI & Technology Updates" },
+              { key: "generalNews", label: "General News" },
+            ].map(({ key, label }) => (
+              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px' }}>
+                <input 
+                  type="checkbox" 
+                  checked={preferences[key as keyof typeof preferences]} 
+                  onChange={(e) => updatePreference(key as keyof typeof preferences, e.target.checked)} 
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

@@ -20,6 +20,15 @@ import { ShareButton } from "./components/shared/ShareButton";
 import { MobileTabBar, type MobileTab } from "./components/app-shell/MobileTabBar";
 import { PullToRefresh } from "./components/app-shell/PullToRefresh";
 import { NotificationManager } from "./components/app-shell/NotificationManager";
+import { AboutView } from "./components/settings/views/AboutView";
+import { CreatorView } from "./components/settings/views/CreatorView";
+import { OperatorView } from "./components/settings/views/OperatorView";
+import { StandardsView } from "./components/settings/views/StandardsView";
+import { SourcesView } from "./components/settings/views/SourcesView";
+import { PrivacyView } from "./components/settings/views/PrivacyView";
+import { DisclaimerView } from "./components/settings/views/DisclaimerView";
+import { CreditsView } from "./components/settings/views/CreditsView";
+import { SettingsRow } from "./components/settings/SettingsRow";
 import { messaging } from "../lib/firebase";
 import { onMessage } from "firebase/messaging";
 
@@ -62,6 +71,7 @@ export function CyberChronicleApp({
   const [mobileTab, setMobileTab] = useState<MobileTab>("home");
   const [isOnline, setIsOnline] = useState(true);
   const [intelFilter, setIntelFilter] = useState<string>("All");
+  const [settingsPage, setSettingsPage] = useState<string>("hub");
 
   const refresh = useCallback(async (force = false) => {
     setIsRefreshing(true);
@@ -280,6 +290,9 @@ export function CyberChronicleApp({
 
   const handleTabChange = (tab: MobileTab) => {
     setMobileTab(tab);
+    if (tab !== "settings") {
+      setSettingsPage("hub");
+    }
     if (tab === "intelligence") {
       setQuery("");
       setActiveDomain("Latest");
@@ -305,7 +318,7 @@ export function CyberChronicleApp({
   }
 
   /* ---- Settings View ---- */
-  const settingsView = (
+  const settingsHub = (
     <div className="settings-view">
       <div className="settings-header">
         <h1>Settings</h1>
@@ -314,11 +327,12 @@ export function CyberChronicleApp({
 
       <div className="settings-group">
         <strong>Appearance</strong>
-        <button className="settings-row" onClick={toggleTheme}>
-          <span>{theme === "light" ? <Moon size={18} /> : <Sun size={18} />}</span>
-          <div><strong>{theme === "light" ? "Dark mode" : "Light mode"}</strong><small>Switch to {theme === "light" ? "dark" : "light"} theme</small></div>
-          <ChevronRight size={16} />
-        </button>
+        <SettingsRow 
+          icon={theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+          title={theme === "light" ? "Dark mode" : "Light mode"}
+          description={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+          onClick={toggleTheme}
+        />
       </div>
 
       <div className="settings-group">
@@ -327,36 +341,48 @@ export function CyberChronicleApp({
       </div>
 
       <div className="settings-group">
-        <strong>App</strong>
-        {installPrompt && (
-          <button className="settings-row" onClick={() => void install()}>
-            <span><Download size={18} /></span>
-            <div><strong>Install Cyber Chronicle</strong><small>Add to your home screen for quick access</small></div>
-            <ChevronRight size={16} />
-          </button>
-        )}
-        <div className="settings-row settings-info">
-          <span><ShieldCheck size={18} /></span>
-          <div>
-            <strong>About</strong>
-            <small>Free edition · {data.sources.length} sources · {ordered.length} stories</small>
-            <small>Last updated {formatDate(data.generatedAt, true)} IST</small>
-          </div>
-        </div>
+        <strong>Intelligence & Data</strong>
+        <SettingsRow icon={<ShieldCheck size={18} />} title="Intelligence Sources" description={`${data.sources.length} active sources reporting`} onClick={() => setSettingsPage("sources")} />
+        <SettingsRow icon={<Check size={18} />} title="Editorial Standards" description="How we verify and classify" onClick={() => setSettingsPage("standards")} />
+        <SettingsRow icon={<ShieldCheck size={18} />} title="Privacy & Data" description="How notifications use your data" onClick={() => setSettingsPage("privacy")} />
       </div>
 
       <div className="settings-group">
-        <strong>Connection</strong>
-        <div className="settings-row settings-info">
-          <span>{isOnline ? <Wifi size={18} /> : <WifiOff size={18} />}</span>
-          <div>
-            <strong>{isOnline ? "Online" : "Offline"}</strong>
-            <small>{isOnline ? `${currentSources}/${data.sources.length} sources reporting` : "Reading cached edition"}</small>
-          </div>
-        </div>
+        <strong>About</strong>
+        <SettingsRow icon={<ExternalLink size={18} />} title="About Cyber Chronicle" onClick={() => setSettingsPage("about")} />
+        <SettingsRow icon={<ExternalLink size={18} />} title="Creator" onClick={() => setSettingsPage("creator")} />
+        <SettingsRow icon={<ExternalLink size={18} />} title="Operator Information" onClick={() => setSettingsPage("operator")} />
+        <SettingsRow icon={<ExternalLink size={18} />} title="Disclaimer" onClick={() => setSettingsPage("disclaimer")} />
+        <SettingsRow icon={<ExternalLink size={18} />} title="Credits & Attribution" onClick={() => setSettingsPage("credits")} />
+      </div>
+
+      <div className="settings-group">
+        <strong>App</strong>
+        {installPrompt && (
+          <SettingsRow icon={<Download size={18} />} title="Install Cyber Chronicle" description="Add to your home screen for quick access" onClick={() => void install()} />
+        )}
+        <SettingsRow 
+          icon={isOnline ? <Wifi size={18} /> : <WifiOff size={18} />}
+          title={isOnline ? "Online" : "Offline"}
+          description={isOnline ? `${currentSources}/${data.sources.length} sources reporting` : "Reading cached edition"}
+        />
       </div>
     </div>
   );
+
+  const settingsView = (() => {
+    switch (settingsPage) {
+      case "about": return <AboutView onBack={() => setSettingsPage("hub")} />;
+      case "creator": return <CreatorView onBack={() => setSettingsPage("hub")} />;
+      case "operator": return <OperatorView onBack={() => setSettingsPage("hub")} />;
+      case "standards": return <StandardsView onBack={() => setSettingsPage("hub")} />;
+      case "sources": return <SourcesView onBack={() => setSettingsPage("hub")} sources={data.sources} />;
+      case "privacy": return <PrivacyView onBack={() => setSettingsPage("hub")} />;
+      case "disclaimer": return <DisclaimerView onBack={() => setSettingsPage("hub")} />;
+      case "credits": return <CreditsView onBack={() => setSettingsPage("hub")} />;
+      default: return settingsHub;
+    }
+  })();
 
   /* ---- Saved View ---- */
   const savedView = (
