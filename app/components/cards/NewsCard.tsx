@@ -5,16 +5,19 @@ import type { RealIntelligenceItem } from "../../../lib/news";
 import { plainTitle, categorySlug, computeDomain, computeIntelligenceType } from "../../../lib/editorial";
 import { beginnerExplanation } from "../../../lib/explanations";
 import { StoryMeta } from "../shared/StoryMeta";
+import { StoryImage } from "../shared/StoryImage";
+
+export type CardVariant = "lead" | "feature" | "standard" | "compact" | "alert" | "text-only";
 
 export function NewsCard({
   item,
-  variant = "standard",
+  variant,
   saved,
   onOpen,
   onSave,
 }: {
   item: RealIntelligenceItem;
-  variant?: "standard" | "compact" | "feature";
+  variant?: CardVariant;
   saved: boolean;
   onOpen: () => void;
   onSave: () => void;
@@ -22,40 +25,47 @@ export function NewsCard({
   const domain = computeDomain(item);
   const intelType = computeIntelligenceType(item);
 
+  let finalVariant: CardVariant = variant ?? "standard";
+
+  if (!variant) {
+    const isHighSeverity =
+      item.metadata?.type === "cyber" &&
+      (item.metadata.severity === "Critical" || item.metadata.severity === "High");
+    const isOfficial = intelType === "Official Advisory";
+
+    if (isOfficial || isHighSeverity) {
+      finalVariant = "alert";
+    } else if (!item.imageUrl) {
+      finalVariant = "text-only";
+    }
+  }
+
   return (
-    <article className={`news-card news-card-${variant}`}>
+    <article className={`news-card news-card-${finalVariant}`}>
       <button className="card-hitbox" onClick={onOpen} aria-label={`Read ${plainTitle(item)}`} />
-      {item.imageUrl ? (
-        <img
-          src={item.imageUrl}
-          alt={plainTitle(item)}
-          className="story-art news-image"
-          loading="lazy"
-          onError={(e) => {
-            // Fallback to the CSS art if the image fails to load
-            const target = e.target as HTMLImageElement;
-            target.style.display = "none";
-            const fallback = target.nextElementSibling as HTMLElement;
-            if (fallback) fallback.style.display = "flex";
-          }}
+      
+      {finalVariant !== "text-only" && finalVariant !== "alert" && (
+        <StoryImage 
+          src={item.imageUrl} 
+          alt={plainTitle(item)} 
+          variant={finalVariant as any} 
+          intelligenceType={intelType} 
+          domain={domain} 
         />
-      ) : null}
-      <div
-        className={`story-art art-${categorySlug(domain)}`}
-        style={{ display: item.imageUrl ? "none" : "flex" }}
-      >
-        <span>{domain}</span>
-        <b>CC</b>
-      </div>
+      )}
+      
       <div className="card-copy">
         <div className="card-kicker">
           <div className="category-chips">
             <span className="category-chip">[{intelType.toUpperCase()}]</span>
           </div>
-          <button className="save-story" onClick={onSave} aria-label={saved ? "Remove saved story" : "Save story"}>{saved ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}</button>
+          <button className="save-story" onClick={onSave} aria-label={saved ? "Remove saved story" : "Save story"}>
+            {saved ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}
+          </button>
         </div>
         <h3>{plainTitle(item)}</h3>
-        {variant !== "compact" && <p>{beginnerExplanation(item)}</p>}
+        {finalVariant !== "compact" && finalVariant !== "alert" && <p>{beginnerExplanation(item)}</p>}
+        {finalVariant === "alert" && <p className="alert-desc">{beginnerExplanation(item)}</p>}
         <StoryMeta item={item} />
       </div>
     </article>

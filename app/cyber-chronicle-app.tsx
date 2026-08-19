@@ -457,46 +457,28 @@ export function CyberChronicleApp({
       )}
 
       <section className="lead-grid" aria-label="Lead stories">
-        <article className="lead-article">
-          <button className="lead-click" onClick={() => markAsRead(hero)} aria-label={`Read ${plainTitle(hero)}`} />
-          {hero.imageUrl ? (
-            <img
-              src={hero.imageUrl}
-              alt={plainTitle(hero)}
-              className="lead-visual news-image"
-              loading="eager"
-              onError={(e) => {
-                const target = e.target as HTMLImageElement;
-                target.style.display = "none";
-                const fallback = target.nextElementSibling as HTMLElement;
-                if (fallback) fallback.style.display = "flex";
-              }}
-            />
-          ) : null}
-          <div
-            className={`lead-visual art-${categorySlug(computeDomain(hero))}`}
-            style={{ display: hero.imageUrl ? "none" : "flex" }}
-          >
-            <span>CYBER CHRONICLE</span>
-            <b>{computeDomain(hero)}</b>
-            <em>Intelligence Briefing</em>
-          </div>
-          <div className="lead-copy">
-            <div className="lead-label"><span>{computeIntelligenceType(hero)}</span><span>{hero.storyState === "developing" ? "Developing" : "Confirmed"}</span></div>
-            <h1>{plainTitle(hero)}</h1>
-            <p>{beginnerExplanation(hero)}</p>
-            <StoryMeta item={hero} />
-          </div>
-        </article>
+        <NewsCard
+          item={hero}
+          variant="lead"
+          saved={savedItems.some(s => s.id === hero.id)}
+          onOpen={() => markAsRead(hero)}
+          onSave={() => toggleSaved(hero.id)}
+        />
 
         <aside className="top-stories">
           <SectionHeading kicker="Intelligence Briefing" title="Top Assessments" />
-          {briefingStories.map((item, index) => (
-            <button className="top-story" key={item.id} onClick={() => markAsRead(item)}>
-              <span>0{index + 1}</span>
-              <div><small>{computeIntelligenceType(item)}</small><h3>{plainTitle(item)}</h3><p>{relativeTime(item.publishedAt)} · {item.primaryPublisher}</p></div>
-            </button>
-          ))}
+          <div className="briefing-assessments-grid">
+            {briefingStories.map((item) => (
+              <NewsCard
+                key={item.id}
+                item={item}
+                variant="compact"
+                saved={savedItems.some(s => s.id === item.id)}
+                onOpen={() => markAsRead(item)}
+                onSave={() => toggleSaved(item.id)}
+              />
+            ))}
+          </div>
         </aside>
       </section>
 
@@ -510,12 +492,15 @@ export function CyberChronicleApp({
       <section className="news-section" id="alerts">
         <SectionHeading kicker="Need to know" title="Active Threats & Advisories" action="View all alerts" onAction={() => handleTabChange("alerts")} />
         <div className="alert-news-grid">
-          {activeThreats.map((item, index) => (
-            <button className="alert-news-item" key={item.id} onClick={() => markAsRead(item)}>
-              <span className="alert-number">{String(index + 1).padStart(2, "0")}</span>
-              <div><span>{verificationLabel(item)}</span><h3>{plainTitle(item)}</h3><p>{beginnerExplanation(item)}</p><small>{formatDate(item.publishedAt)} · {item.primaryPublisher}</small></div>
-              <ChevronRight size={18} />
-            </button>
+          {activeThreats.map((item) => (
+            <NewsCard
+              key={item.id}
+              item={item}
+              variant="alert"
+              saved={savedItems.some(s => s.id === item.id)}
+              onOpen={() => markAsRead(item)}
+              onSave={() => toggleSaved(item.id)}
+            />
           ))}
         </div>
       </section>
