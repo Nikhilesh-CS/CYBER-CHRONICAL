@@ -123,14 +123,18 @@ if (apiKey) {
     
     self.registration.showNotification(data.title || "Cyber Chronicle Alert", {
       body: data.body || "A new security alert has been published.",
-      icon: data.icon || "/CYBER-CHRONICAL/app-icon-192.png",
+      image: data.imageUrl || undefined,
+      icon: "/CYBER-CHRONICAL/app-icon-192.png",
       badge: "/CYBER-CHRONICAL/app-icon-192.png",
-      tag: data.storyId || "cyber-chronicle-alert",
-      renotify: !!data.storyId,
-      data: { url: data.url || "/CYBER-CHRONICAL/" },
+      tag: data.tag || data.storyId || "cyber-chronicle-alert",
+      renotify: data.notificationType === "CRITICAL_ALERT",
+      data: { 
+        url: data.url || "/CYBER-CHRONICAL/",
+        storyId: data.storyId,
+      },
       vibrate: [100, 50, 100],
       actions: [
-        { action: "read", title: "Read now" },
+        { action: "view", title: "View alert" },
         { action: "dismiss", title: "Dismiss" },
       ],
     });

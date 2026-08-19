@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Deny read/write by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /subscribers/{userId} {
+      // Clients cannot read ANY documents, including their own, to prevent token exfiltration
+      allow read: if false;
+      
+      // Allow create/update/delete only for the authenticated user's own document
+      // Note: allow write is a combination of create, update, and delete.
+      allow create, update: if request.auth != null && request.auth.uid == userId
+                            && isValidSubscriber(request.resource.data);
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    function isValidSubscriber(data) {
+      return data.keys().hasOnly(['fcmToken', 'enabled', 'preferences', 'createdAt', 'updatedAt'])
+        && data.fcmToken is string
+        && data.enabled is bool
+        && (data.preferences == null || data.preferences is map)
+        && data.createdAt is string
+        && data.updatedAt is string;
+    }
+  }
+}

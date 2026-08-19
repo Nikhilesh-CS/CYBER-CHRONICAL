@@ -1,10 +1,10 @@
 "use client";
 
-import { Bell, BellOff, Check, Download } from "lucide-react";
+import { Bell, BellOff, Check, Download, Settings2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { signInAnonymously } from "firebase/auth";
-import { doc, setDoc, deleteDoc } from "firebase/firestore";
-import { getToken, deleteToken, onMessage } from "firebase/messaging";
+import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { doc, setDoc, deleteDoc, getDoc } from "firebase/firestore";
+import { getToken, deleteToken } from "firebase/messaging";
 import { auth, db, messaging } from "../../../lib/firebase";
 
 type NotificationState = "default" | "granted" | "denied" | "unsupported" | "needs-install";
@@ -12,6 +12,17 @@ type NotificationState = "default" | "granted" | "denied" | "unsupported" | "nee
 export function NotificationManager() {
   const [state, setState] = useState<NotificationState>("default");
   const [subscribing, setSubscribing] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  
+  const [preferences, setPreferences] = useState({
+    criticalAlerts: true,
+    highSeverityAlerts: true,
+    officialAdvisories: true,
+    dataBreaches: true,
+    threatIntelligence: true,
+    aiTechUpdates: false,
+    generalNews: false
+  });
 
   useEffect(() => {
     // Check if we are in a browser environment
@@ -33,6 +44,32 @@ export function NotificationManager() {
 
     setState(Notification.permission as NotificationState);
   }, []);
+
+  useEffect(() => {
+    if (!auth || !db) return;
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (user && state === "granted") {
+        try {
+          const docSnap = await getDoc(doc(db!, "subscribers", user.uid));
+          if (docSnap.exists() && docSnap.data().preferences) {
+            setPreferences(prev => ({ ...prev, ...docSnap.data().preferences }));
+          }
+        } catch(e) {}
+      }
+    });
+    return unsub;
+  }, [state]);
+
+  const updatePreference = async (key: keyof typeof preferences, value: boolean) => {
+    const newPrefs = { ...preferences, [key]: value };
+    setPreferences(newPrefs);
+    if (auth?.currentUser && db) {
+      await setDoc(doc(db, "subscribers", auth.currentUser.uid), {
+        preferences: newPrefs,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    }
+  };
 
   const subscribe = useCallback(async () => {
     if (state === "denied" || state === "unsupported" || state === "needs-install") return;
@@ -60,6 +97,7 @@ export function NotificationManager() {
           await setDoc(docRef, {
             fcmToken: currentToken,
             enabled: true,
+            preferences,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           }, { merge: true });
@@ -71,7 +109,7 @@ export function NotificationManager() {
     } finally {
       setSubscribing(false);
     }
-  }, [state]);
+  }, [state, preferences]);
 
   const unsubscribe = useCallback(async () => {
     if (!auth || !db || !messaging) return;
@@ -86,6 +124,7 @@ export function NotificationManager() {
       // 2. Delete the token
       await deleteToken(messaging);
       setState("default");
+      setShowSettings(false);
     } catch (err) {
       console.error("Unsubscribe failed", err);
     }
@@ -118,7 +157,7 @@ export function NotificationManager() {
           <strong>Push Notifications</strong>
           <small>
             {state === "granted"
-              ? "You'll receive alerts for critical security news"
+              ? "You'll receive alerts based on your preferences"
               : state === "denied"
                 ? "Notifications are blocked in your browser settings"
                 : "Get notified when critical security alerts are published"}
@@ -126,10 +165,38 @@ export function NotificationManager() {
         </div>
       </div>
       {state === "granted" ? (
-        <div className="notification-actions">
-          <span className="notification-active"><Check size={14} />Active</span>
-          <button onClick={unsubscribe} className="notification-off-btn"><BellOff size={14} />Turn off</button>
-        </div>
+        <>
+          <div className="notification-actions">
+            <span className="notification-active"><Check size={14} />Active</span>
+            <button onClick={() => setShowSettings(!showSettings)} className="notification-off-btn"><Settings2 size={14} />Settings</button>
+            <button onClick={unsubscribe} className="notification-off-btn"><BellOff size={14} />Turn off</button>
+          </div>
+          {showSettings && (
+            <div className="notification-preferences">
+              <strong style={{ display: 'block', marginBottom: '12px', fontSize: '14px', marginTop: '16px' }}>Notification Preferences</strong>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {[
+                  { key: "criticalAlerts", label: "Critical Alerts" },
+                  { key: "highSeverityAlerts", label: "High Severity Alerts" },
+                  { key: "officialAdvisories", label: "Official Advisories" },
+                  { key: "dataBreaches", label: "Data Breaches" },
+                  { key: "threatIntelligence", label: "Threat Intelligence" },
+                  { key: "aiTechUpdates", label: "AI & Technology Updates" },
+                  { key: "generalNews", label: "General News" },
+                ].map(({ key, label }) => (
+                  <label key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px' }}>
+                    <input 
+                      type="checkbox" 
+                      checked={preferences[key as keyof typeof preferences]} 
+                      onChange={(e) => updatePreference(key as keyof typeof preferences, e.target.checked)} 
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       ) : state !== "denied" ? (
         <button onClick={subscribe} disabled={subscribing} className="notification-enable-btn">
           <Bell size={14} />{subscribing ? "Enabling…" : "Enable"}

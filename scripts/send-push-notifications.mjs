@@ -2,28 +2,51 @@
  * send-push-notifications.mjs
  *
  * Reads the generated news.json snapshot and sends push notifications
- * for new critical/official stories via Firebase Admin SDK.
- *
- * Environment variables:
- *   FIREBASE_SERVICE_ACCOUNT — Firebase Service Account JSON (from GitHub secrets)
- *
- * Run from GitHub Actions after the news update and build steps.
+ * via Firebase Admin SDK, using intelligence builder and deduplication.
  */
 
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { resolve, dirname } from "node:path";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
+import { buildNotificationPayload } from "../lib/notifications/buildNotificationPayload.mjs";
 
 const FIREBASE_SERVICE_ACCOUNT = process.env.FIREBASE_SERVICE_ACCOUNT;
 const BATCH_SIZE = 500;
 const NEWS_PATH = resolve("public/data/news.json");
+
 async function readJson(path) {
   try {
     return JSON.parse(await readFile(path, "utf8"));
   } catch {
     return null;
+  }
+}
+
+function wantsNotification(sub, payload) {
+  const pref = sub.preferences || {
+    criticalAlerts: true,
+    highSeverityAlerts: true,
+    officialAdvisories: true,
+    dataBreaches: true,
+    threatIntelligence: true,
+    aiTechUpdates: false,
+    generalNews: false
+  };
+
+  switch (payload.notificationType) {
+    case "CRITICAL_ALERT": return pref.criticalAlerts !== false;
+    case "HIGH_ALERT": return pref.highSeverityAlerts !== false;
+    case "SECURITY_UPDATE": return pref.officialAdvisories !== false;
+    case "INTELLIGENCE_UPDATE":
+      if (payload.intelligenceType === "Data Breach") return pref.dataBreaches !== false;
+      return pref.threatIntelligence !== false;
+    case "NEWS_UPDATE":
+      if (payload.intelligenceType === "AI & Technology") return pref.aiTechUpdates === true;
+      return pref.generalNews === true;
+    default:
+      return false;
   }
 }
 
@@ -39,23 +62,8 @@ async function main() {
     return;
   }
 
-  /* Filter for official or high-confidence cyber stories */
-  const potentialAlerts = edition.items.filter((item) =>
-    item.metadata?.type === "cyber" && (
-      item.verificationStatus === "official" ||
-      item.confidence === "High"
-    )
-  );
-
-  if (potentialAlerts.length === 0) {
-    console.log("No new critical alerts to notify about.");
-    return;
-  }
-
-  // Initialize Firebase Admin
   let serviceAccount;
   try {
-    // Handle both raw JSON and base64 encoded JSON
     const decoded = FIREBASE_SERVICE_ACCOUNT.startsWith("{")
       ? FIREBASE_SERVICE_ACCOUNT
       : Buffer.from(FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf-8");
@@ -73,7 +81,6 @@ async function main() {
 
   const db = getFirestore();
   
-  // Fetch active FIDs (now fcmTokens)
   console.log("Fetching active subscribers from Firestore...");
   const subscribersSnapshot = await db.collection("subscribers").where("enabled", "==", true).get();
   
@@ -81,51 +88,55 @@ async function main() {
   subscribersSnapshot.forEach((doc) => {
     const data = doc.data();
     if (data.fcmToken) {
-      activeSubscribers.push({ uid: doc.id, fcmToken: data.fcmToken });
+      activeSubscribers.push({ uid: doc.id, fcmToken: data.fcmToken, preferences: data.preferences });
     }
   });
 
-  const tokens = activeSubscribers.map(sub => sub.fcmToken);
-
-  if (tokens.length === 0) {
+  if (activeSubscribers.length === 0) {
     console.log("No active subscribers found. Skipping push send.");
     return;
   } 
 
-  console.log(`Found ${tokens.length} active subscriber(s). Checking ${potentialAlerts.length} potential alert(s)…`);
+  console.log(`Found ${activeSubscribers.length} active subscriber(s). Checking edition stories…`);
 
   let notificationsSent = 0;
   const invalidUidsToDelete = new Set();
 
-  for (const alert of potentialAlerts) {
-    if (notificationsSent >= 5) break; // Limit to 5 per run
+  for (const item of edition.items) {
+    if (notificationsSent >= 5) break; // Limit to 5 pushes per run to avoid spamming
 
-    // Check if we've already notified for this story
-    const safeDocId = encodeURIComponent(alert.id);
+    const payload = buildNotificationPayload(item);
+
+    // Some stories are too generic or not cybersecurity related, default preference is off,
+    // but we can evaluate it per user. Let's filter the eligible tokens for this specific payload:
+    const eligibleSubscribers = activeSubscribers.filter(sub => wantsNotification(sub, payload));
+    const tokens = eligibleSubscribers.map(sub => sub.fcmToken);
+
+    if (tokens.length === 0) {
+      continue; // No one wants this specific notification
+    }
+
+    const safeDocId = encodeURIComponent(item.id);
     const notifiedDocRef = db.collection("notifiedStories").doc(safeDocId);
     const notifiedDoc = await notifiedDocRef.get();
     
     if (notifiedDoc.exists) {
-      continue;
+      const lastData = notifiedDoc.data();
+      if (lastData.lastFingerprint === payload.fingerprint) {
+        continue; // Story hasn't changed meaningfully
+      }
+      console.log(`Story ${item.id} changed. Fingerprint mismatch. Escalating notification.`);
     }
 
-    const title = alert.metadata?.identifier ? alert.title.replace(`${alert.metadata.identifier}: `, "") : alert.title.replace(/^CC-[A-Z0-9]+:\s*/, "");
-    const body = alert.studentSummary || `New verified update from ${alert.primaryPublisher}`;
-
     const messageTemplate = {
-      data: {
-        title: `⚠️ ${title}`,
-        body,
-        storyId: alert.id,
-        url: `/CYBER-CHRONICAL/?story=${encodeURIComponent(alert.id)}`,
-      }
+      data: payload // passing only the rich data payload to FCM
     };
 
     let totalSuccessCount = 0;
     // Batch send to a maximum of 500 tokens per request
     for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
       const tokensBatch = tokens.slice(i, i + BATCH_SIZE);
-      const uidsBatch = activeSubscribers.slice(i, i + BATCH_SIZE).map(sub => sub.uid);
+      const uidsBatch = eligibleSubscribers.slice(i, i + BATCH_SIZE).map(sub => sub.uid);
 
       try {
         const response = await getMessaging().sendEachForMulticast({
@@ -134,8 +145,7 @@ async function main() {
         });
 
         totalSuccessCount += response.successCount;
-        console.log(`  ✓ Notified batch of ${tokensBatch.length}: ${title.slice(0, 60)}…`);
-        console.log(`    Success: ${response.successCount}, Failed: ${response.failureCount}`);
+        console.log(`  ✓ Notified batch of ${tokensBatch.length}: ${payload.title}…`);
 
         // Cleanup stale/unregistered tokens
         if (response.failureCount > 0) {
@@ -153,14 +163,18 @@ async function main() {
       }
     }
 
-    // Mark as notified if at least one delivery succeeded
+    // Mark as notified/updated if at least one delivery succeeded
     if (totalSuccessCount > 0) {
-      await notifiedDocRef.set({ sentAt: new Date().toISOString() });
+      await notifiedDocRef.set({ 
+        lastFingerprint: payload.fingerprint,
+        lastNotificationType: payload.notificationType,
+        lastSeverity: payload.severity,
+        lastSentAt: new Date().toISOString()
+      }, { merge: true });
       notificationsSent++;
     }
   }
 
-  // Cleanup stale tokens from Firestore
   if (invalidUidsToDelete.size > 0) {
     console.log(`Cleaning up ${invalidUidsToDelete.size} invalid subscriber(s) from Firestore...`);
     const batch = db.batch();
@@ -178,6 +192,5 @@ async function main() {
 
 main().catch((error) => {
   console.error("Push notification script failed:", error);
-  /* Don't fail the CI pipeline for notification errors */
   process.exitCode = 0;
 });
