@@ -51,13 +51,13 @@ async function main() {
     primaryPublisher: "Security Weekly",
     verificationStatus: "official",
     confidence: "High",
-    imageUrl: "https://example.com/test-image.jpg",
+    imageUrl: "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&q=80&w=1200",
     studentSummary: "A new critical vulnerability in OpenSSL could allow remote code execution. Administrators are advised to update immediately.",
     metadata: {
       type: "cyber",
       severity: "Critical",
-      affectedProducts: ["OpenSSL 3.0"],
-      suggestedActions: ["Update OpenSSL to version 3.0.7 or later"]
+      affected: "OpenSSL 3.0",
+      action: "Update OpenSSL to version 3.0.7 or later"
     }
   };
 
