@@ -20,11 +20,28 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
     
+    function isValidPreferences(prefs) {
+      return prefs == null || (
+        prefs is map
+        && prefs.keys().hasOnly([
+          'criticalAlerts', 'highSeverityAlerts', 'officialAdvisories', 
+          'dataBreaches', 'threatIntelligence', 'aiTechUpdates', 'generalNews'
+        ])
+        && (!('criticalAlerts' in prefs) || prefs.criticalAlerts is bool)
+        && (!('highSeverityAlerts' in prefs) || prefs.highSeverityAlerts is bool)
+        && (!('officialAdvisories' in prefs) || prefs.officialAdvisories is bool)
+        && (!('dataBreaches' in prefs) || prefs.dataBreaches is bool)
+        && (!('threatIntelligence' in prefs) || prefs.threatIntelligence is bool)
+        && (!('aiTechUpdates' in prefs) || prefs.aiTechUpdates is bool)
+        && (!('generalNews' in prefs) || prefs.generalNews is bool)
+      );
+    }
+
     function isValidSubscriber(data) {
       return data.keys().hasOnly(['fcmToken', 'enabled', 'preferences', 'createdAt', 'updatedAt'])
         && data.fcmToken is string
         && data.enabled is bool
-        && (data.preferences == null || data.preferences is map)
+        && isValidPreferences(data.preferences)
         && data.createdAt is string
         && data.updatedAt is string;
     }

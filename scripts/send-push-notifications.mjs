@@ -135,31 +135,60 @@ async function main() {
     let totalSuccessCount = 0;
     // Batch send to a maximum of 500 tokens per request
     for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
-      const tokensBatch = tokens.slice(i, i + BATCH_SIZE);
-      const uidsBatch = eligibleSubscribers.slice(i, i + BATCH_SIZE).map(sub => sub.uid);
+      let currentTokensBatch = tokens.slice(i, i + BATCH_SIZE);
+      let currentUidsBatch = eligibleSubscribers.slice(i, i + BATCH_SIZE).map(sub => sub.uid);
 
-      try {
-        const response = await getMessaging().sendEachForMulticast({
-          ...messageTemplate,
-          tokens: tokensBatch,
-        });
+      let attempts = 0;
+      const maxAttempts = 3;
 
-        totalSuccessCount += response.successCount;
-        console.log(`  ✓ Notified batch of ${tokensBatch.length}: ${payload.title}…`);
-
-        // Cleanup stale/unregistered tokens
-        if (response.failureCount > 0) {
-          response.responses.forEach((resp, idx) => {
-            if (!resp.success) {
-              const errorCode = resp.error?.code;
-              if (errorCode === 'messaging/invalid-registration-token' || errorCode === 'messaging/registration-token-not-registered') {
-                invalidUidsToDelete.add(uidsBatch[idx]);
-              }
-            }
+      while (attempts < maxAttempts && currentTokensBatch.length > 0) {
+        attempts++;
+        try {
+          const response = await getMessaging().sendEachForMulticast({
+            ...messageTemplate,
+            tokens: currentTokensBatch,
           });
+
+          totalSuccessCount += response.successCount;
+          console.log(`  ✓ Notified batch of ${response.successCount}/${currentTokensBatch.length}: ${payload.title} (Attempt ${attempts})`);
+
+          const retryTokens = [];
+          const retryUids = [];
+
+          // Cleanup stale/unregistered tokens and track retries
+          if (response.failureCount > 0) {
+            response.responses.forEach((resp, idx) => {
+              if (!resp.success) {
+                const errorCode = resp.error?.code;
+                if (errorCode === 'messaging/invalid-registration-token' || errorCode === 'messaging/registration-token-not-registered') {
+                  invalidUidsToDelete.add(currentUidsBatch[idx]);
+                } else if (errorCode === 'messaging/internal-error' || errorCode === 'messaging/server-unavailable' || errorCode === 'messaging/timeout') {
+                  retryTokens.push(currentTokensBatch[idx]);
+                  retryUids.push(currentUidsBatch[idx]);
+                }
+              }
+            });
+          }
+
+          if (retryTokens.length > 0 && attempts < maxAttempts) {
+            console.warn(`  ! Transient error for ${retryTokens.length} tokens. Retrying in ${Math.pow(2, attempts)}s...`);
+            await new Promise(res => setTimeout(res, 1000 * Math.pow(2, attempts)));
+            currentTokensBatch = retryTokens;
+            currentUidsBatch = retryUids;
+          } else {
+            if (retryTokens.length > 0) {
+              console.warn(`  ✗ Max retries reached. Dropping ${retryTokens.length} tokens.`);
+            }
+            break;
+          }
+        } catch (error) {
+          console.warn(`  ✗ Batch Error (Attempt ${attempts}): ${error instanceof Error ? error.message : String(error)}`);
+          if (attempts < maxAttempts) {
+            await new Promise(res => setTimeout(res, 1000 * Math.pow(2, attempts)));
+          } else {
+            break;
+          }
         }
-      } catch (error) {
-        console.warn(`  ✗ Batch Error: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 
@@ -192,5 +221,5 @@ async function main() {
 
 main().catch((error) => {
   console.error("Push notification script failed:", error);
-  process.exitCode = 0;
+  process.exitCode = 1;
 });

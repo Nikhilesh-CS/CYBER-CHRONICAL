@@ -103,8 +103,8 @@ self.addEventListener("fetch", (event) => {
 });
 
 /* ---- Firebase Cloud Messaging Background Push ---- */
-importScripts("https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js");
 
 const url = new URL(location);
 const apiKey = url.searchParams.get("apiKey");
