@@ -7,8 +7,9 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { RealIntelligenceItem, RealIntelligenceResponse } from "../lib/news";
 import {
-  type EditorialCategory, categories, categorySlug, editorialCategory,
-  formatDate, plainTitle, relativeTime, verificationLabel,
+  categorySlug, formatDate, plainTitle, relativeTime, verificationLabel,
+  computeDomain, computeIntelligenceType, intelligencePriority,
+  domains, type Domain, type IntelligenceType
 } from "../lib/editorial";
 import { beginnerExplanation } from "../lib/explanations";
 import { NewsCard } from "./components/cards/NewsCard";
@@ -49,7 +50,7 @@ export function CyberChronicleApp({
   const [data, setData] = useState(initialData);
   const [selected, setSelected] = useState<RealIntelligenceItem | null>(null);
   const [query, setQuery] = useState("");
-  const [activeCategory, setActiveCategory] = useState<EditorialCategory | "Latest">("Latest");
+  const [activeDomain, setActiveDomain] = useState<Domain | "Latest">("Latest");
   const [mobileMenu, setMobileMenu] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [saved, setSaved] = useState<string[]>([]);
@@ -60,6 +61,7 @@ export function CyberChronicleApp({
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileTab>("home");
   const [isOnline, setIsOnline] = useState(true);
+  const [intelFilter, setIntelFilter] = useState<string>("All");
 
   const refresh = useCallback(async (force = false) => {
     setIsRefreshing(true);
@@ -141,23 +143,43 @@ export function CyberChronicleApp({
     () => [...data.items].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
     [data.items],
   );
+  
+  const intelligenceOrdered = useMemo(
+    () => [...data.items].sort((a, b) => {
+      const pA = intelligencePriority(a);
+      const pB = intelligencePriority(b);
+      if (pA !== pB) return pB - pA;
+      return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+    }),
+    [data.items],
+  );
+
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return ordered.filter((item) => {
-      const categoryMatches = activeCategory === "Latest" || activeCategory === "Top Stories" || editorialCategory(item) === activeCategory;
+      const categoryMatches = activeDomain === "Latest" || computeDomain(item) === activeDomain;
       const searchMatches = !needle || `${plainTitle(item)} ${item.primaryPublisher} ${item.metadata?.type === "cyber" ? item.metadata.identifier : ""}`.toLowerCase().includes(needle);
       return categoryMatches && searchMatches;
     });
-  }, [activeCategory, ordered, query]);
+  }, [activeDomain, ordered, query]);
 
-  const hero = filtered[0] ?? ordered[0];
-  const topStories = filtered.slice(1, 5);
-  const alerts = ordered.filter((item) => editorialCategory(item) === "Active Security Alerts").slice(0, 4);
-  const privacy = ordered.filter((item) => editorialCategory(item) === "Privacy & Data Breaches").slice(0, 4);
-  const consumer = ordered.filter((item) => editorialCategory(item) === "Mobile & Consumer").slice(0, 4);
-  const enterprise = ordered.filter((item) => editorialCategory(item) === "Company & Enterprise").slice(0, 4);
-  const technology = ordered.filter((item) => editorialCategory(item) === "Technology & AI").slice(0, 4);
-  const world = ordered.filter((item) => editorialCategory(item) === "World Cyber News").slice(0, 4);
+  const hero = intelligenceOrdered[0] ?? ordered[0];
+  const briefingStories = intelligenceOrdered.filter(item => item.id !== hero?.id).slice(0, 4);
+
+  const activeThreats = intelligenceOrdered.filter(item => computeIntelligenceType(item) === "Official Advisory" || item.metadata?.severity === "Critical" || item.metadata?.severity === "High").slice(0, 4);
+  const threatIntel = intelligenceOrdered.filter(item => computeIntelligenceType(item) === "Threat Intelligence").slice(0, 4);
+  const breaches = intelligenceOrdered.filter(item => computeIntelligenceType(item) === "Data Breach" || computeIntelligenceType(item) === "Incident").slice(0, 4);
+
+  const aiTech = ordered.filter(item => computeDomain(item) === "AI & Technology").slice(0, 4);
+  const india = ordered.filter(item => computeDomain(item) === "India").slice(0, 4);
+  const globalIntel = ordered.filter(item => computeDomain(item) === "World" || computeDomain(item) === "Business").slice(0, 4);
+  const enterprise = ordered.filter(item => computeIntelligenceType(item) === "Industry News" || computeDomain(item) === "Business").slice(0, 4);
+  const scienceSpace = ordered.filter(item => computeDomain(item) === "Science" || computeDomain(item) === "Space").slice(0, 4);
+
+  const latestFeed = ordered.slice(0, 10);
+
+  // Still keeping these for Alerts view and some legacy parts
+  const alerts = intelligenceOrdered.filter((item) => computeIntelligenceType(item) === "Official Advisory").slice(0, 20);
   const editorPicks = ordered.filter((item) => item.verificationStatus !== "single-source").slice(0, 3);
   const editionTime = Date.parse(data.generatedAt);
   const weeklyCutoff = Number.isFinite(editionTime) ? editionTime - 7 * 24 * 60 * 60 * 1_000 : 0;
@@ -182,7 +204,7 @@ export function CyberChronicleApp({
 
   const markAsRead = (item: RealIntelligenceItem) => {
     setSelected(item);
-    if (editorialCategory(item) === "Active Security Alerts" && !readAlerts.includes(item.id)) {
+    if (computeIntelligenceType(item) === "Official Advisory" && !readAlerts.includes(item.id)) {
       setReadAlerts((current) => {
         const next = [...current, item.id];
         window.localStorage.setItem("cyber-chronicle-read-alerts", JSON.stringify(next));
@@ -253,20 +275,20 @@ export function CyberChronicleApp({
     setInstallPrompt(null);
   };
 
-  const categoryCount = (category: EditorialCategory) =>
-    ordered.filter((item) => editorialCategory(item) === category).length;
+  const domainCount = (domain: Domain) =>
+    ordered.filter((item) => computeDomain(item) === domain).length;
 
   const handleTabChange = (tab: MobileTab) => {
     setMobileTab(tab);
-    if (tab === "search") {
+    if (tab === "intelligence") {
       setQuery("");
-      setActiveCategory("Latest");
+      setActiveDomain("Latest");
     }
     if (tab === "alerts") {
-      setActiveCategory("Active Security Alerts");
+      setIntelFilter("Official Advisory");
     }
     if (tab === "home") {
-      setActiveCategory("Latest");
+      setActiveDomain("Latest");
       setQuery("");
     }
   };
@@ -359,43 +381,49 @@ export function CyberChronicleApp({
     </div>
   );
 
-  /* ---- Search View ---- */
-  const searchView = (
+  /* ---- Intelligence View ---- */
+  const intelList = useMemo(() => {
+    let list = intelligenceOrdered;
+    if (intelFilter === "High Severity") {
+      list = list.filter(item => item.metadata?.severity === "Critical" || item.metadata?.severity === "High");
+    } else if (intelFilter !== "All") {
+      list = list.filter(item => computeIntelligenceType(item) === intelFilter || computeDomain(item) === intelFilter);
+    }
+    return list;
+  }, [intelligenceOrdered, intelFilter]);
+
+  const intelligenceView = (
     <div className="search-view">
       <div className="search-view-header">
-        <h1>Search</h1>
-        <label className="search-view-input">
-          <Search size={18} />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search all cybersecurity news"
-            aria-label="Search all cybersecurity news"
-            autoFocus
-          />
-          {query && <button onClick={() => setQuery("")} aria-label="Clear search"><X size={16} /></button>}
-        </label>
+        <h1>Intelligence Explorer</h1>
       </div>
-      {query ? (
-        <div className="search-results">
-          <small>{filtered.length} {filtered.length === 1 ? "result" : "results"}</small>
-          {filtered.map((item) => (
-            <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />
-          ))}
-          {filtered.length === 0 && <p className="search-no-results">No stories match &ldquo;{query}&rdquo;</p>}
-        </div>
-      ) : (
-        <div className="search-suggestions">
-          <strong>Browse by category</strong>
-          {categories.map((category) => (
-            <button key={category} onClick={() => { setActiveCategory(category); setMobileTab("home"); }}>
-              <span>{category}</span>
-              <em>{categoryCount(category)} stories</em>
-              <ChevronRight size={15} />
+      <div className="search-suggestions" style={{ marginBottom: "16px" }}>
+        <strong>Filter by intelligence type</strong>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "8px" }}>
+          {["All", "Official Advisory", "High Severity", "Threat Intelligence", "Data Breach", "Vulnerability", "India", "AI & Technology"].map(filter => (
+            <button 
+              key={filter} 
+              onClick={() => setIntelFilter(filter)}
+              style={{ 
+                padding: "6px 12px", 
+                borderRadius: "16px", 
+                border: intelFilter === filter ? "1px solid var(--blue-600)" : "1px solid var(--border)",
+                background: intelFilter === filter ? "var(--blue-50)" : "transparent",
+                color: intelFilter === filter ? "var(--blue-700)" : "var(--foreground)"
+              }}
+            >
+              {filter}
             </button>
           ))}
         </div>
-      )}
+      </div>
+      <div className="search-results">
+        <small>{intelList.length} {intelList.length === 1 ? "result" : "results"}</small>
+        {intelList.map((item) => (
+          <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />
+        ))}
+        {intelList.length === 0 && <p className="search-no-results">No stories match</p>}
+      </div>
     </div>
   );
 
@@ -407,7 +435,7 @@ export function CyberChronicleApp({
         <small>{alerts.length} active alerts</small>
       </div>
       <div className="alerts-full-list">
-        {ordered.filter((item) => editorialCategory(item) === "Active Security Alerts").map((item, index) => (
+        {alerts.map((item, index) => (
           <button className="alert-news-item" key={item.id} onClick={() => markAsRead(item)}>
             <span className="alert-number">{String(index + 1).padStart(2, "0")}</span>
             <div><span>{verificationLabel(item)}</span><h3>{plainTitle(item)}</h3><p>{beginnerExplanation(item)}</p><small>{formatDate(item.publishedAt)} · {item.primaryPublisher}</small></div>
@@ -421,9 +449,9 @@ export function CyberChronicleApp({
   /* ---- Home Feed ---- */
   const homeFeed = (
     <main className="news-home">
-      {(query || activeCategory !== "Latest") && (
+      {(query || activeDomain !== "Latest") && (
         <div className="results-banner">
-          <div><span>Viewing</span><h1>{query ? `Search: "${query}"` : activeCategory}</h1></div>
+          <div><span>Viewing</span><h1>{query ? `Search: "${query}"` : activeDomain}</h1></div>
           <b>{filtered.length} stories</b>
         </div>
       )}
@@ -446,15 +474,15 @@ export function CyberChronicleApp({
             />
           ) : null}
           <div
-            className={`lead-visual art-${categorySlug(editorialCategory(hero))}`}
+            className={`lead-visual art-${categorySlug(computeDomain(hero))}`}
             style={{ display: hero.imageUrl ? "none" : "flex" }}
           >
             <span>CYBER CHRONICLE</span>
-            <b>{editorialCategory(hero)}</b>
-            <em>Verified reporting from the live newsroom</em>
+            <b>{computeDomain(hero)}</b>
+            <em>Intelligence Briefing</em>
           </div>
           <div className="lead-copy">
-            <div className="lead-label"><span>{editorialCategory(hero)}</span><span>{hero.storyState === "developing" ? "Developing" : "Confirmed"}</span></div>
+            <div className="lead-label"><span>{computeIntelligenceType(hero)}</span><span>{hero.storyState === "developing" ? "Developing" : "Confirmed"}</span></div>
             <h1>{plainTitle(hero)}</h1>
             <p>{beginnerExplanation(hero)}</p>
             <StoryMeta item={hero} />
@@ -462,11 +490,11 @@ export function CyberChronicleApp({
         </article>
 
         <aside className="top-stories">
-          <SectionHeading kicker="The latest" title="Top Stories" />
-          {topStories.map((item, index) => (
+          <SectionHeading kicker="Intelligence Briefing" title="Top Assessments" />
+          {briefingStories.map((item, index) => (
             <button className="top-story" key={item.id} onClick={() => markAsRead(item)}>
               <span>0{index + 1}</span>
-              <div><small>{editorialCategory(item)}</small><h3>{plainTitle(item)}</h3><p>{relativeTime(item.publishedAt)} · {item.primaryPublisher}</p></div>
+              <div><small>{computeIntelligenceType(item)}</small><h3>{plainTitle(item)}</h3><p>{relativeTime(item.publishedAt)} · {item.primaryPublisher}</p></div>
             </button>
           ))}
         </aside>
@@ -480,9 +508,9 @@ export function CyberChronicleApp({
       </section>
 
       <section className="news-section" id="alerts">
-        <SectionHeading kicker="Need to know" title="Active Security Alerts" action="View all alerts" onAction={() => handleTabChange("alerts")} />
+        <SectionHeading kicker="Need to know" title="Active Threats & Advisories" action="View all alerts" onAction={() => handleTabChange("alerts")} />
         <div className="alert-news-grid">
-          {alerts.map((item, index) => (
+          {activeThreats.map((item, index) => (
             <button className="alert-news-item" key={item.id} onClick={() => markAsRead(item)}>
               <span className="alert-number">{String(index + 1).padStart(2, "0")}</span>
               <div><span>{verificationLabel(item)}</span><h3>{plainTitle(item)}</h3><p>{beginnerExplanation(item)}</p><small>{formatDate(item.publishedAt)} · {item.primaryPublisher}</small></div>
@@ -493,78 +521,60 @@ export function CyberChronicleApp({
       </section>
 
       <section className="news-section">
-        <SectionHeading kicker="Across the internet" title="World Cyber News" />
+        <SectionHeading kicker="Analysis & Campaigns" title="Threat Intelligence" action="Filter by type" onAction={() => handleTabChange("intelligence")} />
         <div className="four-card-grid">
-          {world.map((item, index) => <NewsCard key={item.id} item={item} variant={index === 0 ? "feature" : "standard"} saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
+          {threatIntel.map((item, index) => <NewsCard key={item.id} item={item} variant={index === 0 ? "feature" : "standard"} saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
         </div>
       </section>
 
       <section className="split-news">
         <div className="news-section">
-          <SectionHeading kicker="Business" title="Company & Enterprise" />
+          <SectionHeading kicker="Your information" title="Breaches & Incidents" />
           <div className="stacked-news">
-            {enterprise.map((item) => <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
+            {breaches.map((item) => <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
           </div>
         </div>
         <div className="news-section">
-          <SectionHeading kicker="Your information" title="Privacy & Data Breaches" />
+          <SectionHeading kicker="The future" title="AI & Emerging Technology" />
           <div className="stacked-news">
-            {privacy.map((item) => <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
+            {aiTech.map((item) => <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
+          </div>
+        </div>
+      </section>
+
+      <section className="news-section">
+        <SectionHeading kicker="Across the internet" title="Global Intelligence" />
+        <div className="four-card-grid">
+          {globalIntel.map((item, index) => <NewsCard key={item.id} item={item} variant={index === 0 ? "feature" : "standard"} saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
+        </div>
+      </section>
+
+      <section className="split-news">
+        <div className="news-section">
+          <SectionHeading kicker="National" title="India Intelligence" />
+          <div className="stacked-news">
+            {india.map((item) => <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
+          </div>
+        </div>
+        <div className="news-section">
+          <SectionHeading kicker="Business" title="Enterprise & Industry" />
+          <div className="stacked-news">
+            {enterprise.map((item) => <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
           </div>
         </div>
       </section>
 
       <section className="daily-briefing">
-        <div className="briefing-intro"><span>THE DAILY BRIEFING</span><h2>Today&apos;s Cyber Roundup</h2><p>The essential cybersecurity stories, explained in a few minutes.</p><small>{formatDate(data.generatedAt, true)} IST</small></div>
+        <div className="briefing-intro"><span>RAW FEED</span><h2>Latest Feed</h2><p>The raw chronological stream of all reported events.</p><small>{formatDate(data.generatedAt, true)} IST</small></div>
         <ol>
-          {ordered.slice(0, 5).map((item) => <li key={item.id}><button onClick={() => markAsRead(item)}><span>{editorialCategory(item)}</span><strong>{plainTitle(item)}</strong><ArrowRight size={15} /></button></li>)}
+          {latestFeed.map((item) => <li key={item.id}><button onClick={() => markAsRead(item)}><span>{computeDomain(item)}</span><strong>{plainTitle(item)}</strong><ArrowRight size={15} /></button></li>)}
         </ol>
-      </section>
-
-      <section className="split-news">
-        <div className="news-section">
-          <SectionHeading kicker="Everyday safety" title="Mobile & Consumer Security" />
-          <div className="stacked-news">
-            {consumer.map((item) => <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
-          </div>
-        </div>
-        <div className="news-section">
-          <SectionHeading kicker="The future" title="Technology & AI Security" />
-          <div className="stacked-news">
-            {technology.map((item) => <NewsCard key={item.id} item={item} variant="compact" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
-          </div>
-        </div>
-      </section>
-
-      <section className="editors-week">
-        <div className="editors-picks">
-          <SectionHeading kicker="Chosen for clarity" title="Editor's Picks" />
-          {editorPicks.map((item, index) => (
-            <button key={item.id} onClick={() => markAsRead(item)}>
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <div><small>{editorialCategory(item)}</small><h3>{plainTitle(item)}</h3><p>{beginnerExplanation(item)}</p></div>
-              <ArrowRight size={17} />
-            </button>
-          ))}
-        </div>
-        <div className="weekly-highlights">
-          <SectionHeading kicker="The week in cyber" title="Weekly Highlights" />
-          <div>
-            {weeklyHighlights.map((item) => (
-              <button key={item.id} onClick={() => markAsRead(item)}>
-                <span>{formatDate(item.publishedAt)}</span>
-                <strong>{plainTitle(item)}</strong>
-                <small>{item.primaryPublisher}</small>
-              </button>
-            ))}
-          </div>
-        </div>
       </section>
 
       <section className="trending-section">
         <div><span>Trending now</span><h2>What readers are following</h2></div>
         <div className="trend-list">
-          {categories.slice(1).map((category, index) => <button key={category} onClick={() => setActiveCategory(category)}><b>{String(index + 1).padStart(2, "0")}</b><span>{category}</span><em>{categoryCount(category)} stories</em></button>)}
+          {domains.map((domain, index) => <button key={domain} onClick={() => setActiveDomain(domain)}><b>{String(index + 1).padStart(2, "0")}</b><span>{domain}</span><em>{domainCount(domain)} stories</em></button>)}
         </div>
       </section>
 
@@ -580,7 +590,7 @@ export function CyberChronicleApp({
   const activeView = (() => {
     switch (mobileTab) {
       case "alerts": return alertsView;
-      case "search": return searchView;
+      case "intelligence": return intelligenceView;
       case "saved": return savedView;
       case "settings": return settingsView;
       default: return homeFeed;
@@ -614,10 +624,10 @@ export function CyberChronicleApp({
         </div>
 
         <nav className={mobileMenu ? "section-nav nav-open" : "section-nav"} aria-label="News sections">
-          <button className={activeCategory === "Latest" ? "active" : ""} onClick={() => { setActiveCategory("Latest"); setMobileMenu(false); setMobileTab("home"); }}>Latest</button>
-          {categories.map((category) => (
-            <button key={category} className={activeCategory === category ? "active" : ""} onClick={() => { setActiveCategory(category); setMobileMenu(false); setMobileTab("home"); }}>
-              {category}
+          <button className={activeDomain === "Latest" ? "active" : ""} onClick={() => { setActiveDomain("Latest"); setMobileMenu(false); setMobileTab("home"); }}>Latest</button>
+          {domains.map((domain) => (
+            <button key={domain} className={activeDomain === domain ? "active" : ""} onClick={() => { setActiveDomain(domain); setMobileMenu(false); setMobileTab("home"); }}>
+              {domain}
             </button>
           ))}
         </nav>

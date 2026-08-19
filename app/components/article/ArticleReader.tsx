@@ -6,8 +6,9 @@ import {
 } from "lucide-react";
 import type { RealIntelligenceItem } from "../../../lib/news";
 import {
-  editorialCategory, formatDate, plainTitle, practicalActions,
+  formatDate, plainTitle, practicalActions,
   readerGuidance, simpleSummary, verificationLabel, whyItMatters,
+  computeIntelligenceType
 } from "../../../lib/editorial";
 import { beginnerExplanation } from "../../../lib/explanations";
 import { jargonFor } from "../../../lib/jargon";
@@ -49,7 +50,7 @@ export function ArticleReader({ item, saved, onSave, onClose }: {
                 }}
               />
             )}
-            <span className="article-section">{editorialCategory(item)}</span>
+            <span className="article-section">{computeIntelligenceType(item)}</span>
             <h1 id="article-title">{title}</h1>
             <p className="article-deck">{explanation}</p>
             <div className="article-byline"><div className="author-mark">CC</div><span><strong>Cyber Chronicle Newsroom</strong><small>Published {formatDate(item.publishedAt, true)} IST · Updated from live sources</small></span></div>
@@ -103,14 +104,15 @@ export function ArticleReader({ item, saved, onSave, onClose }: {
               <p><Clock3 size={16} />The story was last updated from source evidence on {formatDate(item.updatedAt, true)} IST.</p>
             </div>
             {item.unknowns.length > 0 && <div className="developing-note"><strong>Still developing</strong>{item.unknowns.map((unknown) => <p key={unknown}>{unknown}</p>)}</div>}
-            {item.metadata.type === "cyber" && (
-              <div className="cyber-metadata">
-                {item.metadata.severity && <p><strong>Severity:</strong> {item.metadata.severity}</p>}
-                {item.metadata.identifier && <p><strong>Identifier:</strong> {item.metadata.identifier}</p>}
-                {item.metadata.affected && <p><strong>Affected:</strong> {item.metadata.affected}</p>}
-                {item.metadata.action && <p><strong>Action:</strong> {item.metadata.action}</p>}
-              </div>
-            )}
+            <div className="intelligence-metadata-grid">
+              <p><strong>Status:</strong> {item.storyState === "developing" ? "Developing" : "Confirmed"}</p>
+              <p><strong>Confidence:</strong> {item.confidence || "Unknown"}</p>
+              <p><strong>Independent sources:</strong> {item.independentSourceCount}</p>
+              {item.metadata.type === "cyber" && item.metadata.severity && <p><strong>Severity:</strong> {item.metadata.severity}</p>}
+              {item.metadata.type === "cyber" && item.metadata.identifier && <p><strong>Identifier:</strong> {item.metadata.identifier}</p>}
+              {item.metadata.type === "cyber" && item.metadata.affected && <p><strong>Affected:</strong> {item.metadata.affected}</p>}
+              {item.metadata.type === "cyber" && item.metadata.action && <p><strong>Recommended action:</strong> {item.metadata.action}</p>}
+            </div>
           </section>
 
           <section className="article-block">

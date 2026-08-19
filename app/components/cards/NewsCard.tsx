@@ -2,7 +2,7 @@
 
 import { Bookmark, BookmarkCheck } from "lucide-react";
 import type { RealIntelligenceItem } from "../../../lib/news";
-import { plainTitle, editorialCategory, categorySlug } from "../../../lib/editorial";
+import { plainTitle, editorialCategory, categorySlug, computeDomain, computeIntelligenceType } from "../../../lib/editorial";
 import { beginnerExplanation } from "../../../lib/explanations";
 import { StoryMeta } from "../shared/StoryMeta";
 
@@ -19,6 +19,9 @@ export function NewsCard({
   onOpen: () => void;
   onSave: () => void;
 }) {
+  const domain = computeDomain(item);
+  const intelType = computeIntelligenceType(item);
+
   return (
     <article className={`news-card news-card-${variant}`}>
       <button className="card-hitbox" onClick={onOpen} aria-label={`Read ${plainTitle(item)}`} />
@@ -38,18 +41,16 @@ export function NewsCard({
         />
       ) : null}
       <div
-        className={`story-art art-${categorySlug(editorialCategory(item))}`}
+        className={`story-art art-${categorySlug(domain)}`}
         style={{ display: item.imageUrl ? "none" : "flex" }}
       >
-        <span>{editorialCategory(item)}</span>
+        <span>{domain}</span>
         <b>CC</b>
       </div>
       <div className="card-copy">
         <div className="card-kicker">
           <div className="category-chips">
-            {(item.categories || []).slice(0, 3).map(cat => (
-              <span key={cat} className="category-chip">[{cat.charAt(0).toUpperCase() + cat.slice(1)}]</span>
-            ))}
+            <span className="category-chip">[{intelType.toUpperCase()}]</span>
           </div>
           <button className="save-story" onClick={onSave} aria-label={saved ? "Remove saved story" : "Save story"}>{saved ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}</button>
         </div>

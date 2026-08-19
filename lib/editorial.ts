@@ -1,24 +1,5 @@
 import type { RealIntelligenceItem } from "./news.ts";
 
-export type EditorialCategory =
-  | "Top Stories"
-  | "World Cyber News"
-  | "Active Security Alerts"
-  | "Company & Enterprise"
-  | "Privacy & Data Breaches"
-  | "Mobile & Consumer"
-  | "Technology & AI";
-
-export const categories: EditorialCategory[] = [
-  "Top Stories",
-  "World Cyber News",
-  "Active Security Alerts",
-  "Company & Enterprise",
-  "Privacy & Data Breaches",
-  "Mobile & Consumer",
-  "Technology & AI",
-];
-
 export function plainTitle(item: RealIntelligenceItem) {
   if (item.metadata?.type === "cyber" && item.metadata.identifier) {
     return item.title.replace(`${item.metadata.identifier}: `, "");
@@ -47,28 +28,112 @@ export function relativeTime(value: string) {
   return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
-export function editorialCategory(item: RealIntelligenceItem): EditorialCategory {
-  const text = plainTitle(item).toLowerCase();
-  if (item.verificationStatus === "official" || /\b(advisory|patch|vulnerabilit|exploit|zero.day|security update)\b/.test(text)) {
-    return "Active Security Alerts";
-  }
-  if (/\b(breach|leak|privacy|personal data|stolen data|exposed|identity)\b/.test(text)) {
-    return "Privacy & Data Breaches";
-  }
-  if (/\b(android|iphone|ios|mobile|smartphone|whatsapp|consumer|browser|extension|app)\b/.test(text)) {
-    return "Mobile & Consumer";
-  }
-  if (/\b(ai|artificial intelligence|openai|model|cloud|github|software|technology)\b/.test(text)) {
-    return "Technology & AI";
-  }
-  if (/\b(company|business|enterprise|bank|organisation|organization|startup|industry|ciso)\b/.test(text)) {
-    return "Company & Enterprise";
-  }
-  return "World Cyber News";
+export function categorySlug(category: string): string {
+  return category.toLowerCase().replaceAll(" ", "-").replaceAll("&", "and");
 }
 
-export function categorySlug(category: EditorialCategory): string {
-  return category.toLowerCase().replaceAll(" ", "-").replaceAll("&", "and");
+export type Domain =
+  | "Cybersecurity"
+  | "AI & Technology"
+  | "Business"
+  | "World"
+  | "India"
+  | "Science"
+  | "Space";
+
+export type IntelligenceType =
+  | "Official Advisory"
+  | "Threat Intelligence"
+  | "Incident"
+  | "Vulnerability"
+  | "Data Breach"
+  | "Research"
+  | "Industry News"
+  | "General News";
+
+export function computeDomain(item: RealIntelligenceItem): Domain {
+  const text = plainTitle(item).toLowerCase();
+  if (item.region === "india" || /\b(india|indian|delhi|mumbai|bangalore|narendra modi|rupee|cert-in|rbi|sebi|pib|isro)\b/.test(text)) {
+    return "India";
+  }
+  if (/\b(science|scientific|physics|chemistry|biology|discovery|experiment)\b/.test(text)) {
+    return "Science";
+  }
+  if (/\b(space|nasa|esa|spacex|satellite|orbit|moon|mars|lunar|galaxy|telescope)\b/.test(text)) {
+    return "Space";
+  }
+  if (/\b(ai|artificial intelligence|machine learning|openai|gemini|llm|chatgpt|model)\b/.test(text)) {
+    return "AI & Technology";
+  }
+  if (/\b(cyber|ransomware|malware|phishing|breach|hack|vulnerability|exploit|security)\b/.test(text)) {
+    return "Cybersecurity";
+  }
+  if (/\b(company|business|enterprise|bank|startup|funding|revenue|ceo|industry)\b/.test(text)) {
+    return "Business";
+  }
+  return "World";
+}
+
+export function computeIntelligenceType(item: RealIntelligenceItem): IntelligenceType {
+  const text = plainTitle(item).toLowerCase();
+  
+  if (item.verificationStatus === "official" || /\b(advisory|patch|security update)\b/.test(text)) {
+    return "Official Advisory";
+  }
+  if (/\b(vulnerabilit|exploit|zero-day|cve-)\b/.test(text)) {
+    return "Vulnerability";
+  }
+  if (/\b(breach|leak|personal data|stolen data|exposed data)\b/.test(text)) {
+    return "Data Breach";
+  }
+  if (/\b(ransomware|attack|incident|hacked|compromise)\b/.test(text)) {
+    return "Incident";
+  }
+  if (/\b(threat|campaign|apt|botnet|malware|trojan|spyware|actor|research)\b/.test(text)) {
+    return "Threat Intelligence";
+  }
+  if (/\b(study|report|analysis|paper)\b/.test(text)) {
+    return "Research";
+  }
+  if (/\b(acquisition|merger|startup|funding|industry|market)\b/.test(text)) {
+    return "Industry News";
+  }
+  return "General News";
+}
+
+export function intelligencePriority(item: RealIntelligenceItem): number {
+  let score = 0;
+  
+  if (item.metadata?.type === "cyber") {
+    switch (item.metadata.severity) {
+      case "Critical": score += 40; break;
+      case "High": score += 30; break;
+      case "Medium": score += 20; break;
+      case "Low": score += 10; break;
+    }
+  }
+
+  if (item.verificationStatus === "official") {
+    score += 30;
+  }
+
+  score += Math.min(item.independentSourceCount * 10, 30);
+
+  if (item.confidence === "High") {
+    score += 20;
+  } else if (item.confidence === "Medium") {
+    score += 10;
+  }
+
+  const hoursOld = (Date.now() - new Date(item.publishedAt).getTime()) / (1000 * 60 * 60);
+  if (hoursOld < 24) {
+    score += Math.max(0, 30 - hoursOld);
+  }
+
+  const domain = computeDomain(item);
+  if (domain === "Cybersecurity") score += 10;
+  
+  return score;
 }
 
 export function verificationLabel(item: RealIntelligenceItem) {
@@ -83,31 +148,29 @@ export function simpleSummary(item: RealIntelligenceItem) {
 }
 
 export function whyItMatters(item: RealIntelligenceItem) {
-  const category = editorialCategory(item);
-  const copy: Record<EditorialCategory, string> = {
-    "Top Stories": "This is among the most recent significant developments in the cybersecurity news cycle.",
-    "World Cyber News": "Cyber incidents can spread across borders quickly, affecting services, supply chains, and people far from the original event.",
-    "Active Security Alerts": "Security weaknesses can put devices or business systems at risk if affected software is left unpatched.",
-    "Company & Enterprise": "A major security issue at one organisation can affect employees, customers, suppliers, and connected services.",
-    "Privacy & Data Breaches": "Exposed personal information can be used for fraud, phishing, impersonation, or unwanted account access.",
-    "Mobile & Consumer": "This may involve devices, apps, or online services used in everyday life, so clear practical guidance matters.",
-    "Technology & AI": "Changes in widely used technology can create new security risks and alter how defenders and attackers operate.",
+  const type = computeIntelligenceType(item);
+  const copy: Partial<Record<IntelligenceType, string>> = {
+    "Official Advisory": "Security weaknesses can put devices or business systems at risk if affected software is left unpatched.",
+    "Data Breach": "Exposed personal information can be used for fraud, phishing, impersonation, or unwanted account access.",
+    "Incident": "Cyber incidents can spread across borders quickly, affecting services, supply chains, and people far from the original event.",
+    "Threat Intelligence": "Changes in widely used technology can create new security risks and alter how defenders and attackers operate.",
+    "Vulnerability": "Security weaknesses can put devices or business systems at risk if affected software is left unpatched."
   };
-  return copy[category];
+  return copy[type] ?? "This is among the most recent significant developments in the cybersecurity news cycle.";
 }
 
 export type GuidanceLevel = "safe" | "watch" | "act" | "urgent";
 
 export function readerGuidance(item: RealIntelligenceItem): readonly (readonly [string, string, GuidanceLevel])[] {
-  const category = editorialCategory(item);
-  if (category === "Active Security Alerts") {
+  const type = computeIntelligenceType(item);
+  if (type === "Official Advisory" || type === "Vulnerability") {
     return [
       ["Home users", "Keep devices updated and check whether the named product is installed.", "watch"],
       ["Small businesses", "Ask your IT provider to review affected versions and official patch guidance.", "act"],
       ["Large organisations", "Confirm exposure, prioritise official remediation, and monitor for suspicious activity.", "urgent"],
     ] as const;
   }
-  if (category === "Privacy & Data Breaches") {
+  if (type === "Data Breach") {
     return [
       ["Home users", "Watch for direct notices from the organisation and be alert for follow-up phishing.", "watch"],
       ["Small businesses", "Check whether staff, customers, or suppliers use the affected service.", "watch"],
