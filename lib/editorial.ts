@@ -41,6 +41,16 @@ export type Domain =
   | "Science"
   | "Space";
 
+export const domains: Domain[] = [
+  "Cybersecurity",
+  "AI & Technology",
+  "Business",
+  "World",
+  "India",
+  "Science",
+  "Space"
+];
+
 export type IntelligenceType =
   | "Official Advisory"
   | "Threat Intelligence"
@@ -50,6 +60,17 @@ export type IntelligenceType =
   | "Research"
   | "Industry News"
   | "General News";
+
+export const intelligenceTypes: IntelligenceType[] = [
+  "Official Advisory",
+  "Threat Intelligence",
+  "Incident",
+  "Vulnerability",
+  "Data Breach",
+  "Research",
+  "Industry News",
+  "General News"
+];
 
 export function computeDomain(item: RealIntelligenceItem): Domain {
   const text = plainTitle(item).toLowerCase();
