@@ -166,7 +166,7 @@ export function CyberChronicleApp({
   const hero = intelligenceOrdered[0] ?? ordered[0];
   const briefingStories = intelligenceOrdered.filter(item => item.id !== hero?.id).slice(0, 4);
 
-  const activeThreats = intelligenceOrdered.filter(item => computeIntelligenceType(item) === "Official Advisory" || item.metadata?.severity === "Critical" || item.metadata?.severity === "High").slice(0, 4);
+  const activeThreats = intelligenceOrdered.filter(item => computeIntelligenceType(item) === "Official Advisory" || (item.metadata?.type === "cyber" && (item.metadata.severity === "Critical" || item.metadata.severity === "High"))).slice(0, 4);
   const threatIntel = intelligenceOrdered.filter(item => computeIntelligenceType(item) === "Threat Intelligence").slice(0, 4);
   const breaches = intelligenceOrdered.filter(item => computeIntelligenceType(item) === "Data Breach" || computeIntelligenceType(item) === "Incident").slice(0, 4);
 
@@ -385,7 +385,7 @@ export function CyberChronicleApp({
   const intelList = useMemo(() => {
     let list = intelligenceOrdered;
     if (intelFilter === "High Severity") {
-      list = list.filter(item => item.metadata?.severity === "Critical" || item.metadata?.severity === "High");
+      list = list.filter(item => item.metadata?.type === "cyber" && (item.metadata.severity === "Critical" || item.metadata.severity === "High"));
     } else if (intelFilter !== "All") {
       list = list.filter(item => computeIntelligenceType(item) === intelFilter || computeDomain(item) === intelFilter);
     }

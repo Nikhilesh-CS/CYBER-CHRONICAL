@@ -2,7 +2,7 @@
 
 import { Bookmark, BookmarkCheck } from "lucide-react";
 import type { RealIntelligenceItem } from "../../../lib/news";
-import { plainTitle, editorialCategory, categorySlug, computeDomain, computeIntelligenceType } from "../../../lib/editorial";
+import { plainTitle, categorySlug, computeDomain, computeIntelligenceType } from "../../../lib/editorial";
 import { beginnerExplanation } from "../../../lib/explanations";
 import { StoryMeta } from "../shared/StoryMeta";
 
