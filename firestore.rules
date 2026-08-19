@@ -9,8 +9,9 @@ service cloud.firestore {
     }
 
     match /subscribers/{userId} {
-      // Clients cannot read ANY documents, including their own, to prevent token exfiltration
-      allow read: if false;
+      // Clients cannot read ALL documents, but can read their own
+      allow get: if request.auth != null && request.auth.uid == userId;
+      allow list: if false;
       
       // Allow create/update/delete only for the authenticated user's own document
       // Note: allow write is a combination of create, update, and delete.
