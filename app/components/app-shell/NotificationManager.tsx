@@ -76,15 +76,14 @@ export function NotificationManager() {
   const unsubscribe = useCallback(async () => {
     if (!auth || !db || !messaging) return;
     try {
-      // 1. Authenticate anonymously to verify UID
-      const userCredential = await signInAnonymously(auth);
-      const uid = userCredential.user.uid;
+      // 1. Remove from Firestore if authenticated
+      const user = auth.currentUser;
+      if (user) {
+        const docRef = doc(db!, "subscribers", user.uid);
+        await deleteDoc(docRef);
+      }
 
-      // 2. Remove from Firestore
-      const docRef = doc(db!, "subscribers", uid);
-      await deleteDoc(docRef);
-
-      // 3. Delete the token
+      // 2. Delete the token
       await deleteToken(messaging);
       setState("default");
     } catch (err) {

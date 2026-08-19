@@ -140,7 +140,20 @@ if (apiKey) {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   if (event.action === "dismiss") return;
-  const targetUrl = event.notification.data?.url || "/CYBER-CHRONICAL/";
+  
+  let targetUrl = event.notification.data?.url || "/CYBER-CHRONICAL/";
+  try {
+    const parsedUrl = new URL(targetUrl, self.location.origin);
+    if (parsedUrl.origin !== self.location.origin) {
+      console.warn("Cross-origin notification navigation blocked:", targetUrl);
+      targetUrl = "/CYBER-CHRONICAL/";
+    } else {
+      targetUrl = parsedUrl.href;
+    }
+  } catch (e) {
+    targetUrl = "/CYBER-CHRONICAL/";
+  }
+
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
