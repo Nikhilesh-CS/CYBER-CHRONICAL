@@ -2,19 +2,17 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
-const root = new URL("../", import.meta.url);
-
 test("exports the Cyber Chronicle digital newspaper as static HTML", async () => {
   const html = await readFile(new URL("../out/index.html", import.meta.url), "utf8");
   assert.match(html, /Cyber Chronicle/);
   assert.match(html, /Trusted Cybersecurity News\. Simplified\./);
-  assert.match(html, /Top Stories/);
-  assert.match(html, /World Cyber News/);
-  assert.match(html, /Active Security Alerts/);
-  assert.match(html, /Privacy &amp; Data Breaches/);
-  assert.match(html, /Today.*s Cyber Roundup/);
-  assert.match(html, /Editor.*s Picks/);
-  assert.match(html, /Weekly Highlights/);
+  assert.match(html, /Top Assessments/);
+  assert.match(html, /Global Intelligence/);
+  assert.match(html, /Active Threats &amp; Advisories/);
+  assert.match(html, /Breaches &amp; Incidents/);
+  assert.match(html, /Threat Intelligence/);
+  assert.match(html, /AI &amp; Emerging Technology/);
+  assert.match(html, /Latest Feed/);
   assert.match(html, /Trust is the story/);
   assert.match(html, /Free edition/);
   assert.match(html, /\/CYBER-CHRONICAL\/data\/news\.json/);
@@ -23,13 +21,12 @@ test("exports the Cyber Chronicle digital newspaper as static HTML", async () =>
 });
 
 test("ships product metadata and removes disposable starter assets", async () => {
-  const [layout, page, app, articleReader, jargonLib, explanationsLib, packageJson, manifest, serviceWorker] = await Promise.all([
+  const [layout, page, app, articleReader, jargonLib, packageJson, manifest, serviceWorker] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/cyber-chronicle-app.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/article/ArticleReader.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/jargon.ts", import.meta.url), "utf8"),
-    readFile(new URL("../lib/explanations.ts", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../public/manifest.webmanifest", import.meta.url), "utf8"),
     readFile(new URL("../public/service-worker.js", import.meta.url), "utf8"),

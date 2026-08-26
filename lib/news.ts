@@ -1,7 +1,7 @@
 import type { RealIntelligenceItem, RealIntelligenceResponse, SourceResult } from "./models.ts";
 import { getSourceDefinitions } from "./sources.ts";
 import { fetchXml, parseRssFeed } from "./parsers/rss.ts";
-import { fetchHtml, parseCertInIndex } from "./parsers/html.ts";
+import { enrichItemsWithPageImages, fetchHtml, parseCertInIndex } from "./parsers/html.ts";
 
 const FRESH_FOR_MS = 5 * 60 * 1_000;
 const STALE_FOR_MS = 6 * 60 * 60 * 1_000;
@@ -62,7 +62,7 @@ export function mergeItems(items: RealIntelligenceItem[]): RealIntelligenceItem[
 
 export function createRealIntelligenceService(
   fetcher: typeof fetch = fetch,
-  options: { sourceIds?: string[] } = {},
+  options: { sourceIds?: string[]; enrichImages?: boolean } = {},
 ) {
   let snapshot: Snapshot | null = null;
   let inFlight: Promise<RealIntelligenceResponse> | null = null;
@@ -80,6 +80,9 @@ export function createRealIntelligenceService(
           parsed = parseCertInIndex(await fetchHtml(definition.url, fetcher), definition);
         } else if (definition.kind === "rss") {
           parsed = parseRssFeed(await fetchXml(definition.url, fetcher), definition);
+        }
+        if (options.enrichImages !== false) {
+          parsed = await enrichItemsWithPageImages(parsed, definition, fetcher);
         }
         return { items: parsed, retrievedFrom: definition.url };
       }),

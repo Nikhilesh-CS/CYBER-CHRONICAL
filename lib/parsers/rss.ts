@@ -2,6 +2,7 @@ import type { RealIntelligenceItem } from "../models.ts";
 import type { SourceDefinition } from "../sources.ts";
 import { decodeHtml, stableHash, FETCH_TIMEOUT_MS, MAX_RESPONSE_BYTES } from "./utils.ts";
 import { OFFICIAL_CYBER_TOPIC, TOPIC_FILTERS, enhanceCategories } from "../classifiers.ts";
+import { normalizeImageUrl } from "./html.ts";
 
 function xmlField(block: string, field: string): string {
   const match = new RegExp(`<${field}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${field}>`, "i").exec(block);
@@ -31,22 +32,8 @@ function extractImageUrl(block: string, baseUrl: string): string | undefined {
   for (const pattern of patterns) {
     const match = pattern.exec(block);
     if (match && match[1]) {
-      let url = match[1].trim();
-      if (url.startsWith('data:') || url.startsWith('javascript:')) continue;
-      
-      if (url.startsWith('//')) {
-        url = `https:${url}`;
-      } else if (url.startsWith('/')) {
-        try {
-          url = new URL(url, baseUrl).toString();
-        } catch {
-          continue;
-        }
-      }
-
-      if (url.startsWith('http://') || url.startsWith('https://')) {
-        return url;
-      }
+      const normalized = normalizeImageUrl(match[1], baseUrl);
+      if (normalized) return normalized;
     }
   }
   return undefined;

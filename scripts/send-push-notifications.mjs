@@ -24,7 +24,7 @@ async function readJson(path) {
   }
 }
 
-function wantsNotification(sub, payload) {
+function checkPreference(sub, payload) {
   const pref = sub.preferences || {
     criticalAlerts: true,
     highSeverityAlerts: true,
@@ -36,17 +36,17 @@ function wantsNotification(sub, payload) {
   };
 
   switch (payload.notificationType) {
-    case "CRITICAL_ALERT": return pref.criticalAlerts !== false;
-    case "HIGH_ALERT": return pref.highSeverityAlerts !== false;
-    case "SECURITY_UPDATE": return pref.officialAdvisories !== false;
+    case "CRITICAL_ALERT": return { wants: pref.criticalAlerts !== false, reason: "criticalAlerts" };
+    case "HIGH_ALERT": return { wants: pref.highSeverityAlerts !== false, reason: "highSeverityAlerts" };
+    case "SECURITY_UPDATE": return { wants: pref.officialAdvisories !== false, reason: "officialAdvisories" };
     case "INTELLIGENCE_UPDATE":
-      if (payload.intelligenceType === "Data Breach") return pref.dataBreaches !== false;
-      return pref.threatIntelligence !== false;
+      if (payload.intelligenceType === "Data Breach") return { wants: pref.dataBreaches !== false, reason: "dataBreaches" };
+      return { wants: pref.threatIntelligence !== false, reason: "threatIntelligence" };
     case "NEWS_UPDATE":
-      if (payload.intelligenceType === "AI & Technology") return pref.aiTechUpdates === true;
-      return pref.generalNews === true;
+      if (payload.intelligenceType === "AI & Technology") return { wants: pref.aiTechUpdates === true, reason: "aiTechUpdates" };
+      return { wants: pref.generalNews === true, reason: "generalNews" };
     default:
-      return false;
+      return { wants: false, reason: "unknownType" };
   }
 }
 
@@ -112,10 +112,16 @@ async function main() {
 
     // Some stories are too generic or not cybersecurity related, default preference is off,
     // but we can evaluate it per user. Let's filter the eligible tokens for this specific payload:
-    const eligibleSubscribers = activeSubscribers.filter(sub => wantsNotification(sub, payload));
+    let skippedReason = null;
+    const eligibleSubscribers = activeSubscribers.filter(sub => {
+      const result = checkPreference(sub, payload);
+      if (!result.wants) skippedReason = result.reason;
+      return result.wants;
+    });
     const tokens = eligibleSubscribers.map(sub => sub.fcmToken);
 
     if (tokens.length === 0) {
+      console.log(`[PUSH] Skipped (preferences): "${payload.title}" (Required: ${skippedReason || 'none'})`);
       storiesSkippedNoRecipients++;
       continue; // No one wants this specific notification
     }
@@ -127,6 +133,7 @@ async function main() {
     if (notifiedDoc.exists) {
       const lastData = notifiedDoc.data();
       if (lastData.lastFingerprint === payload.fingerprint) {
+        console.log(`[PUSH] Skipped (dedup): "${payload.title}" (Fingerprint match)`);
         storiesSkippedDedup++;
         continue; // Story hasn't changed meaningfully
       }

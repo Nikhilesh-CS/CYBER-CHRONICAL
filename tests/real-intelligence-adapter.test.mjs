@@ -32,7 +32,7 @@ function htmlResponse(payload, status = 200, contentType = "text/html; charset=I
 
 const certInSourceIds = ["cert-in-advisories", "cert-in-vulnerability-notes"];
 const createCertInService = (fetcher) =>
-  createRealIntelligenceService(fetcher, { sourceIds: certInSourceIds });
+  createRealIntelligenceService(fetcher, { sourceIds: certInSourceIds, enrichImages: false });
 
 test("returns only official CERT-In India records with explicit attribution", async () => {
   const requested = [];
@@ -191,7 +191,7 @@ test("marks matching reports from independent publishers as corroborated", async
     return url.includes("economictimes")
       ? rssResponse(headline, "https://ciso.economictimes.indiatimes.com/news/cybercrime/test-story/123")
       : rssResponse(headline, "https://www.seqrite.com/blog/test-story/");
-  }, { sourceIds: ["et-ciso-news", "seqrite-research"] });
+  }, { sourceIds: ["et-ciso-news", "seqrite-research"], enrichImages: false });
 
   const payload = await service(new Date("2026-07-23T09:00:00Z"));
 
@@ -212,7 +212,7 @@ test("keeps a single news report developing and stores metadata instead of artic
       "https://ciso.economictimes.indiatimes.com/news/cybercrime/test-breach/124",
       `data breach ${copiedText}`,
     ),
-    { sourceIds: ["et-ciso-news"] },
+    { sourceIds: ["et-ciso-news"], enrichImages: false },
   );
 
   const payload = await service(new Date("2026-07-23T09:00:00Z"));
