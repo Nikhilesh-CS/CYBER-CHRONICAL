@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { signInAnonymously, onAuthStateChanged } from "firebase/auth";
 import { doc, setDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { getToken, deleteToken } from "firebase/messaging";
-import { auth, db, messaging } from "../../../lib/firebase";
+import { auth, db, getMessagingInstance } from "../../../lib/firebase";
 
 type NotificationState = "default" | "granted" | "denied" | "unsupported" | "needs-install";
 
@@ -79,6 +79,7 @@ export function NotificationManager() {
       const permission = await Notification.requestPermission();
       setState(permission as NotificationState);
 
+      const messaging = await getMessagingInstance();
       if (permission === "granted" && auth && db && messaging) {
         // 1. Authenticate anonymously
         const userCredential = await signInAnonymously(auth);
@@ -112,7 +113,7 @@ export function NotificationManager() {
   }, [state, preferences]);
 
   const unsubscribe = useCallback(async () => {
-    if (!auth || !db || !messaging) return;
+    if (!auth || !db) return;
     try {
       // 1. Remove from Firestore if authenticated
       const user = auth.currentUser;
@@ -122,7 +123,8 @@ export function NotificationManager() {
       }
 
       // 2. Delete the token
-      await deleteToken(messaging);
+      const messaging = await getMessagingInstance();
+      if (messaging) await deleteToken(messaging);
       setState("default");
       setShowSettings(false);
     } catch (err) {

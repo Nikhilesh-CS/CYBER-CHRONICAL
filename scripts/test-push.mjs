@@ -1,29 +1,28 @@
 /**
  * test-push.mjs
  *
- * An isolated development script to test rich push notifications.
- * It sends a dummy critical alert payload to a specific test token.
+ * Minimal test script — sends the simplest possible push notification
+ * to verify the entire pipeline works before adding complexity.
  *
  * Required environment variables:
- *   FIREBASE_SERVICE_ACCOUNT - Firebase Service Account JSON
+ *   FIREBASE_SERVICE_ACCOUNT - Firebase Service Account JSON (raw or base64)
  *   TEST_FCM_TOKEN - The target device FCM token
  */
 
 import { initializeApp, cert, getApps } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
-import { buildNotificationPayload } from "../lib/notifications/buildNotificationPayload.mjs";
 
 const FIREBASE_SERVICE_ACCOUNT = process.env.FIREBASE_SERVICE_ACCOUNT;
 const TEST_FCM_TOKEN = process.env.TEST_FCM_TOKEN;
 
 async function main() {
   if (!FIREBASE_SERVICE_ACCOUNT) {
-    console.error("Missing FIREBASE_SERVICE_ACCOUNT environment variable.");
+    console.error("[TEST PUSH] Missing FIREBASE_SERVICE_ACCOUNT environment variable.");
     process.exit(1);
   }
   
   if (!TEST_FCM_TOKEN) {
-    console.error("Missing TEST_FCM_TOKEN environment variable. You must provide a test FCM token.");
+    console.error("[TEST PUSH] Missing TEST_FCM_TOKEN environment variable. You must provide a test FCM token.");
     process.exit(1);
   }
 
@@ -34,7 +33,7 @@ async function main() {
       : Buffer.from(FIREBASE_SERVICE_ACCOUNT, "base64").toString("utf-8");
     serviceAccount = JSON.parse(decoded);
   } catch (error) {
-    console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT secret.");
+    console.error("[TEST PUSH] Failed to parse FIREBASE_SERVICE_ACCOUNT secret.");
     process.exit(1);
   }
 
@@ -44,27 +43,20 @@ async function main() {
     });
   }
 
-  // Create a dummy item to simulate a critical cybersecurity alert
-  const dummyItem = {
-    id: "test-critical-alert-" + Date.now(),
-    title: "TEST: Critical Zero-Day Vulnerability Found in OpenSSL",
-    primaryPublisher: "Security Weekly",
-    verificationStatus: "official",
-    confidence: "High",
-    imageUrl: "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&q=80&w=1200",
-    studentSummary: "A new critical vulnerability in OpenSSL could allow remote code execution. Administrators are advised to update immediately.",
-    metadata: {
-      type: "cyber",
-      severity: "Critical",
-      affected: "OpenSSL 3.0",
-      action: "Update OpenSSL to version 3.0.7 or later"
-    }
+  // Simplest possible payload — no image, no severity, no dedup, no preferences.
+  // One signal, six suspects max.
+  const payload = {
+    title: "Cyber Chronicle Test",
+    body: "Push notification pipeline is working.",
+    url: "/CYBER-CHRONICAL/",
+    tag: "cyber-chronicle-test",
+    storyId: "test-" + Date.now(),
+    notificationType: "NEWS_UPDATE",
   };
 
-  const payload = buildNotificationPayload(dummyItem);
-
-  console.log("Generated Payload:");
-  console.log(JSON.stringify(payload, null, 2));
+  console.log("[TEST PUSH] Token loaded:", TEST_FCM_TOKEN.substring(0, 20) + "...");
+  console.log("[TEST PUSH] Payload:", JSON.stringify(payload, null, 2));
+  console.log("[TEST PUSH] Sending...");
 
   try {
     const response = await getMessaging().send({
@@ -72,9 +64,10 @@ async function main() {
       token: TEST_FCM_TOKEN,
     });
     
-    console.log("Successfully sent test notification:", response);
+    console.log("[TEST PUSH] ✓ Success:", response);
   } catch (error) {
-    console.error("Error sending test notification:", error);
+    console.error("[TEST PUSH] ✗ Failed:", error);
+    process.exitCode = 1;
   }
 }
 

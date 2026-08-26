@@ -97,9 +97,12 @@ async function main() {
     return;
   } 
 
-  console.log(`Found ${activeSubscribers.length} active subscriber(s). Checking edition stories…`);
+  console.log(`[PUSH] Found ${activeSubscribers.length} active subscriber(s).`);
+  console.log(`[PUSH] Stories loaded: ${edition.items.length}`);
 
   let notificationsSent = 0;
+  let storiesSkippedDedup = 0;
+  let storiesSkippedNoRecipients = 0;
   const invalidUidsToDelete = new Set();
 
   for (const item of edition.items) {
@@ -113,6 +116,7 @@ async function main() {
     const tokens = eligibleSubscribers.map(sub => sub.fcmToken);
 
     if (tokens.length === 0) {
+      storiesSkippedNoRecipients++;
       continue; // No one wants this specific notification
     }
 
@@ -123,16 +127,20 @@ async function main() {
     if (notifiedDoc.exists) {
       const lastData = notifiedDoc.data();
       if (lastData.lastFingerprint === payload.fingerprint) {
+        storiesSkippedDedup++;
         continue; // Story hasn't changed meaningfully
       }
-      console.log(`Story ${item.id} changed. Fingerprint mismatch. Escalating notification.`);
+      console.log(`[PUSH] Story ${item.id} changed — fingerprint mismatch, re-notifying.`);
     }
+
+    console.log(`[PUSH] Sending: "${payload.title}" (${payload.notificationType}) → ${tokens.length} recipient(s)`);
 
     const messageTemplate = {
       data: payload // passing only the rich data payload to FCM
     };
 
     let totalSuccessCount = 0;
+    let totalFailCount = 0;
     // Batch send to a maximum of 500 tokens per request
     for (let i = 0; i < tokens.length; i += BATCH_SIZE) {
       let currentTokensBatch = tokens.slice(i, i + BATCH_SIZE);
@@ -150,7 +158,8 @@ async function main() {
           });
 
           totalSuccessCount += response.successCount;
-          console.log(`  ✓ Notified batch of ${response.successCount}/${currentTokensBatch.length}: ${payload.title} (Attempt ${attempts})`);
+          totalFailCount += response.failureCount;
+          console.log(`[PUSH]   ✓ Batch: ${response.successCount} success, ${response.failureCount} failed (attempt ${attempts})`);
 
           const retryTokens = [];
           const retryUids = [];
@@ -165,24 +174,26 @@ async function main() {
                 } else if (errorCode === 'messaging/internal-error' || errorCode === 'messaging/server-unavailable' || errorCode === 'messaging/timeout') {
                   retryTokens.push(currentTokensBatch[idx]);
                   retryUids.push(currentUidsBatch[idx]);
+                } else {
+                  console.warn(`[PUSH]   ✗ Token error: ${errorCode}`);
                 }
               }
             });
           }
 
           if (retryTokens.length > 0 && attempts < maxAttempts) {
-            console.warn(`  ! Transient error for ${retryTokens.length} tokens. Retrying in ${Math.pow(2, attempts)}s...`);
+            console.warn(`[PUSH]   ! Transient error for ${retryTokens.length} tokens. Retrying in ${Math.pow(2, attempts)}s...`);
             await new Promise(res => setTimeout(res, 1000 * Math.pow(2, attempts)));
             currentTokensBatch = retryTokens;
             currentUidsBatch = retryUids;
           } else {
             if (retryTokens.length > 0) {
-              console.warn(`  ✗ Max retries reached. Dropping ${retryTokens.length} tokens.`);
+              console.warn(`[PUSH]   ✗ Max retries reached. Dropping ${retryTokens.length} tokens.`);
             }
             break;
           }
         } catch (error) {
-          console.warn(`  ✗ Batch Error (Attempt ${attempts}): ${error instanceof Error ? error.message : String(error)}`);
+          console.warn(`[PUSH]   ✗ Batch Error (Attempt ${attempts}): ${error instanceof Error ? error.message : String(error)}`);
           if (attempts < maxAttempts) {
             await new Promise(res => setTimeout(res, 1000 * Math.pow(2, attempts)));
           } else {
@@ -203,6 +214,12 @@ async function main() {
       notificationsSent++;
     }
   }
+
+  console.log(`[PUSH] ── Pipeline Summary ──`);
+  console.log(`[PUSH] Stories loaded:        ${edition.items.length}`);
+  console.log(`[PUSH] Skipped (dedup):       ${storiesSkippedDedup}`);
+  console.log(`[PUSH] Skipped (no recipients): ${storiesSkippedNoRecipients}`);
+  console.log(`[PUSH] Notifications sent:    ${notificationsSent}`);
 
   if (invalidUidsToDelete.size > 0) {
     console.log(`Cleaning up ${invalidUidsToDelete.size} invalid subscriber(s) from Firestore...`);

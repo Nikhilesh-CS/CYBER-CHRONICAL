@@ -29,7 +29,7 @@ import { PrivacyView } from "./components/settings/views/PrivacyView";
 import { DisclaimerView } from "./components/settings/views/DisclaimerView";
 import { CreditsView } from "./components/settings/views/CreditsView";
 import { SettingsRow } from "./components/settings/SettingsRow";
-import { messaging } from "../lib/firebase";
+import { getMessagingInstance } from "../lib/firebase";
 import { onMessage } from "firebase/messaging";
 
 type InstallPrompt = Event & {
@@ -269,13 +269,16 @@ export function CyberChronicleApp({
   }, [openStoryById]);
 
   useEffect(() => {
-    if (!messaging) return;
-    const unsubscribe = onMessage(messaging, (payload) => {
-      if (payload.data && payload.data.title && payload.data.storyId) {
-        setForegroundAlert({ title: payload.data.title, storyId: payload.data.storyId });
-      }
+    let unsubscribe: (() => void) | undefined;
+    getMessagingInstance().then((msg) => {
+      if (!msg) return;
+      unsubscribe = onMessage(msg, (payload) => {
+        if (payload.data && payload.data.title && payload.data.storyId) {
+          setForegroundAlert({ title: payload.data.title, storyId: payload.data.storyId });
+        }
+      });
     });
-    return () => unsubscribe();
+    return () => unsubscribe?.();
   }, []);
 
   const install = async () => {

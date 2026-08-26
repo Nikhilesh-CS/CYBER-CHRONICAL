@@ -109,6 +109,7 @@ importScripts("https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-com
 const url = new URL(location);
 const apiKey = url.searchParams.get("apiKey");
 if (apiKey) {
+  console.log("[SW] Firebase config found — initializing...");
   firebase.initializeApp({
     apiKey: url.searchParams.get("apiKey"),
     projectId: url.searchParams.get("projectId"),
@@ -116,11 +117,14 @@ if (apiKey) {
     appId: url.searchParams.get("appId"),
   });
   const messaging = firebase.messaging();
+  console.log("[SW] Firebase Messaging initialized ✓");
   
   messaging.onBackgroundMessage((payload) => {
+    console.log("[SW] Background message received:", JSON.stringify(payload.data || {}));
     if (!payload.data) return;
     const data = payload.data;
     
+    console.log("[SW] Showing notification:", data.title, "| image:", data.imageUrl || "none");
     self.registration.showNotification(data.title || "Cyber Chronicle Alert", {
       body: data.body || "A new security alert has been published.",
       image: data.imageUrl || undefined,
@@ -139,6 +143,8 @@ if (apiKey) {
       ],
     });
   });
+} else {
+  console.warn("[SW] No Firebase config in URL params — push notifications will not work.");
 }
 
 self.addEventListener("notificationclick", (event) => {
