@@ -576,6 +576,12 @@ img.article-hero-image { display: block; width: calc(100% + 120px); height: 280p
 .search-results { padding-top: 18px; }
 .search-results > small { display: block; margin-bottom: 14px; color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
 .search-no-results { padding: 40px 0; text-align: center; color: var(--muted); font-family: Georgia, serif; font-size: 15px; }
+.search-empty-state { margin: 18px 0 36px; padding: clamp(36px, 8vw, 72px) 24px; border: 1px solid var(--line); background: var(--surface); text-align: center; }
+.search-empty-state svg { color: var(--brand); }
+.search-empty-state h2 { margin: 14px 0 8px; font-family: Georgia, serif; font-size: clamp(24px, 4vw, 36px); }
+.search-empty-state p { max-width: 650px; margin: 0 auto 20px; color: var(--muted); line-height: 1.65; }
+.search-empty-state button { border: 0; padding: 11px 17px; background: var(--ink); color: var(--paper); font-weight: 750; cursor: pointer; }
+.scoped-results { margin-top: 34px; }
 .search-suggestions { padding-top: 24px; }
 .search-suggestions > strong { display: block; margin-bottom: 12px; color: var(--brand); font-size: 9px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }
 .search-suggestions button {

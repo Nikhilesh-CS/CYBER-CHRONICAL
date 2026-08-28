@@ -10,7 +10,7 @@ import type { RealIntelligenceItem, RealIntelligenceResponse } from "../lib/news
 import {
   formatDate, plainTitle, relativeTime, verificationLabel,
   breakingScore, computeDomain, computeIntelligenceType, isBreakingStory,
-  domains, type Domain
+  matchesStoryQuery, storiesForDomain, domains, type Domain
 } from "../lib/editorial";
 import { learnFromStory, rankForReader, readInterestProfile, INTEREST_PROFILE_KEY } from "../lib/intelligence/client";
 import type { IntelligenceIndex, InterestProfile } from "../lib/intelligence/types";
@@ -189,14 +189,14 @@ export function CyberChronicleApp({
     [data.items, intelligenceIndex, interestProfile],
   );
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return ordered.filter((item) => {
-      const categoryMatches = activeDomain === "Latest" || computeDomain(item) === activeDomain;
-      const searchMatches = !needle || `${plainTitle(item)} ${item.primaryPublisher} ${item.metadata?.type === "cyber" ? item.metadata.identifier : ""}`.toLowerCase().includes(needle);
-      return categoryMatches && searchMatches;
-    });
-  }, [activeDomain, ordered, query]);
+  const domainStories = useMemo(
+    () => storiesForDomain(intelligenceOrdered, activeDomain),
+    [activeDomain, intelligenceOrdered],
+  );
+  const filtered = useMemo(
+    () => domainStories.filter((item) => matchesStoryQuery(item, query)),
+    [domainStories, query],
+  );
 
   const breakingStories = useMemo(() => intelligenceOrdered
     .filter((item) => isBreakingStory(item, rankingNow, intelligenceIndex?.stories[item.id]?.corroborationVelocity || 0))
@@ -204,8 +204,14 @@ export function CyberChronicleApp({
       - breakingScore(left, rankingNow, intelligenceIndex?.stories[left.id]?.corroborationVelocity || 0)),
   [intelligenceIndex, intelligenceOrdered, rankingNow]);
   const breakingStory = breakingStories[0] ?? null;
-  const hero = breakingStory ?? intelligenceOrdered[0] ?? ordered[0];
-  const briefingStories = intelligenceOrdered.filter(item => item.id !== hero?.id).slice(0, 4);
+  const activeBreakingStory = breakingStories.find((story) => filtered.some((item) => item.id === story.id)) ?? null;
+  const hero = activeBreakingStory ?? filtered[0] ?? null;
+  const editionHero = breakingStory ?? intelligenceOrdered[0] ?? ordered[0] ?? null;
+  const headlineStory = hero ?? editionHero;
+  const briefingStories = filtered.filter(item => item.id !== hero?.id).slice(0, 4);
+  const leadStoryIds = new Set([hero?.id, ...briefingStories.map((item) => item.id)].filter(Boolean));
+  const remainingFilteredStories = filtered.filter((item) => !leadStoryIds.has(item.id));
+  const isScopedView = Boolean(query.trim()) || activeDomain !== "Latest";
 
   const activeThreats = intelligenceOrdered.filter(item => computeIntelligenceType(item) === "Official Advisory" || (item.metadata?.type === "cyber" && (item.metadata.severity === "Critical" || item.metadata.severity === "High"))).slice(0, 4);
   const threatIntel = intelligenceOrdered.filter(item => computeIntelligenceType(item) === "Threat Intelligence").slice(0, 4);
@@ -396,7 +402,7 @@ export function CyberChronicleApp({
     setSelected(null);
   };
 
-  if (!hero) {
+  if (!editionHero || !headlineStory) {
     return (
       <main className="empty-edition">
         <div className="wordmark">Cyber Chronicle</div>
@@ -579,33 +585,52 @@ export function CyberChronicleApp({
         </div>
       )}
 
-      <section className={`lead-grid ${breakingStory ? "lead-grid-breaking" : ""}`} aria-label="Lead stories">
-        {breakingStory && <motion.div className="breaking-hero-label" initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}><i />LIVE BREAKING INTELLIGENCE</motion.div>}
-        <NewsCard
-          item={hero}
-          variant="lead"
-          saved={savedItems.some(s => s.id === hero.id)}
-          onOpen={() => markAsRead(hero)}
-          onSave={() => toggleSaved(hero.id)}
-        />
+      {hero ? (
+        <section className={`lead-grid ${activeBreakingStory ? "lead-grid-breaking" : ""}`} aria-label="Lead stories">
+          {activeBreakingStory && <motion.div className="breaking-hero-label" initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}><i />LIVE BREAKING INTELLIGENCE</motion.div>}
+          <NewsCard
+            item={hero}
+            variant="lead"
+            saved={savedItems.some(s => s.id === hero.id)}
+            onOpen={() => markAsRead(hero)}
+            onSave={() => toggleSaved(hero.id)}
+          />
 
-        <aside className="top-stories">
-          <SectionHeading kicker="Intelligence Briefing" title="Top Assessments" />
-          <div className="briefing-assessments-grid">
-            {briefingStories.map((item) => (
-              <NewsCard
-                key={item.id}
-                item={item}
-                variant="compact"
-                saved={savedItems.some(s => s.id === item.id)}
-                onOpen={() => markAsRead(item)}
-                onSave={() => toggleSaved(item.id)}
-              />
-            ))}
+          <aside className="top-stories">
+            <SectionHeading kicker="Intelligence Briefing" title="Top Assessments" />
+            <div className="briefing-assessments-grid">
+              {briefingStories.map((item) => (
+                <NewsCard
+                  key={item.id}
+                  item={item}
+                  variant="compact"
+                  saved={savedItems.some(s => s.id === item.id)}
+                  onOpen={() => markAsRead(item)}
+                  onSave={() => toggleSaved(item.id)}
+                />
+              ))}
+            </div>
+          </aside>
+        </section>
+      ) : (
+        <section className="search-empty-state" aria-live="polite">
+          <Search size={28} />
+          <h2>No matching stories in this edition</h2>
+          <p>Try fewer words, check the spelling, or search all sections. Search matches each word across headlines, summaries, categories, publishers, and advisory details.</p>
+          <button onClick={() => { setQuery(""); handleDomainChange("Latest"); }}>Browse the latest edition</button>
+        </section>
+      )}
+
+      {isScopedView && remainingFilteredStories.length > 0 && (
+        <section className="news-section scoped-results" aria-label="More matching stories">
+          <SectionHeading kicker="More results" title="All Matching Stories" />
+          <div className="four-card-grid">
+            {remainingFilteredStories.map((item) => <NewsCard key={item.id} item={item} variant="standard" saved={saved.includes(item.id)} onSave={() => toggleSaved(item.id)} onOpen={() => markAsRead(item)} />)}
           </div>
-        </aside>
-      </section>
+        </section>
+      )}
 
+      {!isScopedView && <>
       <section className="trust-ribbon" aria-label="Newsroom transparency">
         <div><ShieldCheck size={20} /><span><strong>Evidence first</strong>Every story links to its sources</span></div>
         <div><Check size={20} /><span><strong>Clear status</strong>Developing reports are labelled</span></div>
@@ -683,9 +708,10 @@ export function CyberChronicleApp({
       <section className="trending-section">
         <div><span>Trending now</span><h2>What readers are following</h2></div>
         <div className="trend-list">
-          {domains.map((domain, index) => <button key={domain} onClick={() => setActiveDomain(domain)}><b>{String(index + 1).padStart(2, "0")}</b><span>{domain}</span><em>{domainCount(domain)} stories</em></button>)}
+          {domains.map((domain, index) => <button key={domain} onClick={() => handleDomainChange(domain)}><b>{String(index + 1).padStart(2, "0")}</b><span>{domain}</span><em>{domainCount(domain)} stories</em></button>)}
         </div>
       </section>
+      </>}
 
       <section className="standards-section" id="standards">
         <div><span>OUR PROMISE</span><h2>Trust is the story.</h2></div>
@@ -743,15 +769,15 @@ export function CyberChronicleApp({
         </nav>
 
         <motion.div
-          key={breakingStory?.id || hero.id}
-          className={`breaking-strip ${breakingStory ? "breaking-active" : "breaking-latest"}`}
+          key={activeBreakingStory?.id || headlineStory.id}
+          className={`breaking-strip ${activeBreakingStory ? "breaking-active" : "breaking-latest"}`}
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28 }}
         >
-          <strong>{breakingStory ? "BREAKING" : "LATEST"}</strong>
-          <button onClick={() => markAsRead(hero)}><span>{plainTitle(hero)}</span><ChevronRight size={15} /></button>
-          <small>{relativeTime(hero.publishedAt)}</small>
+          <strong>{activeBreakingStory ? "BREAKING" : activeDomain === "Latest" ? "LATEST" : activeDomain.toUpperCase()}</strong>
+          <button onClick={() => markAsRead(headlineStory)}><span>{plainTitle(headlineStory)}</span><ChevronRight size={15} /></button>
+          <small>{relativeTime(headlineStory.publishedAt)}</small>
         </motion.div>
         {refreshMessage && <div className="refresh-note"><Check size={15} />{refreshMessage}<button onClick={() => setRefreshMessage(null)} aria-label="Dismiss update message"><X size={14} /></button></div>}
         <AnimatePresence>{appNotice && <motion.div className="refresh-note alert-banner" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}><ShieldCheck size={15} /><span style={{ flex: 1 }}>{appNotice}</span><button onClick={() => setAppNotice(null)} aria-label="Dismiss"><X size={14} /></button></motion.div>}</AnimatePresence>

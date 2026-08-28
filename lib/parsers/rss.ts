@@ -10,7 +10,7 @@ function xmlField(block: string, field: string): string {
 }
 
 function rssStudentSummary(definition: SourceDefinition, title: string): string {
-  if (definition.trustTier === 1 && definition.authority.includes("Official")) {
+  if (definition.trustTier === 1 && definition.authority.toLowerCase().includes("official")) {
     return `${definition.publisher} published an official update titled “${title}”. Open the source to see who it applies to and what action is required.`;
   }
   if (definition.categories.includes("cyber") && (definition.authority.includes("research") || definition.name.includes("Intelligence"))) {
@@ -112,7 +112,9 @@ export function parseRssFeed(xml: string, definition: SourceDefinition): RealInt
     const identifier = `CC-${stableHash(key).toUpperCase()}`;
     const official = definition.trustTier === 1;
     const studentSummary = rssStudentSummary(definition, title);
-    const sourceSummary = feedSummary(description, title);
+    const sourceSummary = definition.feedSummaryPolicy === "metadata-only"
+      ? undefined
+      : feedSummary(description, title);
     
     const finalCategories = enhanceCategories(definition.categories, title, description);
     const imageUrl = extractImageUrl(block, parsedUrl.origin);
@@ -121,7 +123,9 @@ export function parseRssFeed(xml: string, definition: SourceDefinition): RealInt
       id: key,
       sourceId: definition.id,
       title: `${identifier}: ${title}`,
-      summary: sourceSummary ?? "The publisher did not include a usable summary in its feed. Open the source for complete context.",
+      summary: sourceSummary ?? (definition.feedSummaryPolicy === "metadata-only"
+        ? "Cyber Chronicle retains only the headline, publisher, date, and link from this feed. Open the original report for its full context."
+        : "The publisher did not include a usable summary in its feed. Open the source for complete context."),
       publishedAt,
       updatedAt: publishedAt,
       categories: finalCategories,

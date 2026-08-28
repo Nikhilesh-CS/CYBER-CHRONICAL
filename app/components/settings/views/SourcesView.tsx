@@ -16,6 +16,10 @@ export function SourcesView({ onBack, sources }: { onBack: () => void; sources: 
       "CYBERSECURITY NEWS": [],
       "TECHNOLOGY & AI": [],
       "SCIENCE & SPACE": [],
+      "BUSINESS & MARKETS": [],
+      "ENVIRONMENT": [],
+      "SPORTS": [],
+      "ENTERTAINMENT & CULTURE": [],
       "WORLD / GENERAL NEWS": [],
     };
     for (const source of sources) {

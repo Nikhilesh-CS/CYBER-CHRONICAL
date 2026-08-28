@@ -36,19 +36,27 @@ export type Domain =
   | "Cybersecurity"
   | "AI & Technology"
   | "Business"
+  | "Markets"
   | "World"
   | "India"
   | "Science"
-  | "Space";
+  | "Space"
+  | "Environment"
+  | "Sports"
+  | "Entertainment";
 
 export const domains: Domain[] = [
   "Cybersecurity",
   "AI & Technology",
   "Business",
+  "Markets",
   "World",
   "India",
   "Science",
-  "Space"
+  "Space",
+  "Environment",
+  "Sports",
+  "Entertainment",
 ];
 
 export type IntelligenceType =
@@ -73,26 +81,76 @@ export const intelligenceTypes: IntelligenceType[] = [
 ];
 
 export function computeDomain(item: RealIntelligenceItem): Domain {
-  const text = plainTitle(item).toLowerCase();
-  if (item.region === "india" || /\b(india|indian|delhi|mumbai|bangalore|narendra modi|rupee|cert-in|rbi|sebi|pib|isro)\b/.test(text)) {
-    return "India";
-  }
-  if (/\b(science|scientific|physics|chemistry|biology|discovery|experiment)\b/.test(text)) {
-    return "Science";
-  }
-  if (/\b(space|nasa|esa|spacex|satellite|orbit|moon|mars|lunar|galaxy|telescope)\b/.test(text)) {
-    return "Space";
-  }
-  if (/\b(ai|artificial intelligence|machine learning|openai|gemini|llm|chatgpt|model)\b/.test(text)) {
-    return "AI & Technology";
-  }
-  if (/\b(cyber|ransomware|malware|phishing|breach|hack|vulnerability|exploit|security)\b/.test(text)) {
+  const text = `${plainTitle(item)} ${item.summary ?? ""} ${item.studentSummary ?? ""}`.toLowerCase();
+  const categories = new Set(item.categories ?? []);
+
+  // Subject matter wins over geography. An Indian cyber advisory is still
+  // cybersecurity; India remains available as the geographic fallback.
+  if (item.metadata?.type === "cyber" || categories.has("cyber") || /\b(cyber|ransomware|malware|phishing|breach|hack(?:ed|ing)?|vulnerabilit(?:y|ies)|exploit|zero-day|security advisory)\b/.test(text)) {
     return "Cybersecurity";
   }
-  if (/\b(company|business|enterprise|bank|startup|funding|revenue|ceo|industry)\b/.test(text)) {
+  if (categories.has("space") || /\b(space|nasa|esa|spacex|isro|satellite|orbit|moon|mars|lunar|galaxy|telescope|spacecraft|rocket)\b/.test(text)) {
+    return "Space";
+  }
+  if (categories.has("ai") || /\b(ai|artificial intelligence|machine learning|openai|gemini|llm|chatgpt|neural network|foundation model)\b/.test(text)) {
+    return "AI & Technology";
+  }
+  if (categories.has("environment") || /\b(climate|environment|emissions?|renewable energy|global warming|biodiversity|pollution|conservation)\b/.test(text)) {
+    return "Environment";
+  }
+  if (categories.has("sports") || /\b(sport|football|cricket|tennis|basketball|olympic|formula 1|fifa|uefa|ipl|nba|nfl)\b/.test(text)) {
+    return "Sports";
+  }
+  if (categories.has("entertainment") || /\b(entertainment|film|movie|cinema|television|streaming|music|actor|actress|box office|hollywood|bollywood)\b/.test(text)) {
+    return "Entertainment";
+  }
+  if (categories.has("markets") || /\b(stock|stocks|shares|market|markets|nasdaq|sensex|nifty|commodity|commodities|bond|bonds|investor|trading)\b/.test(text)) {
+    return "Markets";
+  }
+  if (categories.has("science") || /\b(science|scientific|physics|chemistry|biology|discovery|experiment|researchers?)\b/.test(text)) {
+    return "Science";
+  }
+  if (categories.has("technology") || /\b(technology|software|hardware|computer|chip|semiconductor|robot|internet|digital)\b/.test(text)) {
+    return "AI & Technology";
+  }
+  if (categories.has("business") || /\b(company|business|enterprise|bank|startup|funding|revenue|ceo|industry|acquisition|merger)\b/.test(text)) {
     return "Business";
   }
+  if (item.region === "india" || categories.has("india") || /\b(india|indian|delhi|mumbai|bengaluru|bangalore|narendra modi|rupee|pib)\b/.test(text)) {
+    return "India";
+  }
   return "World";
+}
+
+function normalizedSearchText(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+export function matchesStoryQuery(item: RealIntelligenceItem, query: string): boolean {
+  const tokens = normalizedSearchText(query).split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+  const metadata = item.metadata?.type === "cyber"
+    ? `${item.metadata.identifier ?? ""} ${item.metadata.affected ?? ""} ${item.metadata.action ?? ""}`
+    : "";
+  const searchable = normalizedSearchText([
+    plainTitle(item),
+    item.summary,
+    item.studentSummary,
+    item.primaryPublisher,
+    ...(item.categories ?? []),
+    item.region,
+    metadata,
+  ].filter(Boolean).join(" "));
+  return tokens.every((token) => searchable.includes(token));
+}
+
+export function storiesForDomain(items: RealIntelligenceItem[], domain: Domain | "Latest") {
+  return domain === "Latest" ? items : items.filter((item) => computeDomain(item) === domain);
 }
 
 export function computeIntelligenceType(item: RealIntelligenceItem): IntelligenceType {
@@ -244,6 +302,10 @@ export type SourceGroup =
   | "CYBERSECURITY NEWS"
   | "TECHNOLOGY & AI"
   | "SCIENCE & SPACE"
+  | "BUSINESS & MARKETS"
+  | "ENVIRONMENT"
+  | "SPORTS"
+  | "ENTERTAINMENT & CULTURE"
   | "WORLD / GENERAL NEWS";
 
 export function computeSourceGroup(source: { trustTier: number; authority: string; categories: string[]; name: string }): SourceGroup {
@@ -270,6 +332,14 @@ export function computeSourceGroup(source: { trustTier: number; authority: strin
   if (cats.includes("science") || cats.includes("space")) {
     return "SCIENCE & SPACE";
   }
+
+  if (cats.includes("business") || cats.includes("markets")) {
+    return "BUSINESS & MARKETS";
+  }
+
+  if (cats.includes("environment")) return "ENVIRONMENT";
+  if (cats.includes("sports")) return "SPORTS";
+  if (cats.includes("entertainment")) return "ENTERTAINMENT & CULTURE";
 
   return "WORLD / GENERAL NEWS";
 }
