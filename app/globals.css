@@ -594,6 +594,27 @@ img.article-hero-image { display: block; width: calc(100% + 120px); height: 280p
 .search-suggestions button em { color: var(--muted); font-size: 10px; font-style: normal; }
 .search-suggestions button:hover span { color: var(--brand); }
 
+.intelligence-filters { margin-bottom: 16px; padding-top: 24px; min-width: 0; }
+.intelligence-filters > strong { display: block; margin-bottom: 10px; color: var(--brand); font-size: 9px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }
+.intelligence-filter-rail {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 2px 1px 8px;
+  overflow-x: auto; overscroll-behavior-inline: contain;
+  scrollbar-width: thin; scrollbar-color: var(--line-dark) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+.intelligence-filter-rail button {
+  flex: 0 0 auto; min-height: 36px; padding: 7px 13px;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface); color: var(--ink-soft);
+  font: inherit; font-size: 11px; font-weight: 700; white-space: nowrap;
+  cursor: pointer; transition: border-color .15s, background .15s, color .15s;
+}
+.intelligence-filter-rail button:hover { border-color: var(--brand); color: var(--brand); }
+.intelligence-filter-rail button.active,
+.intelligence-filter-rail button[aria-pressed="true"] { border-color: var(--brand); background: var(--brand); color: #fff; }
+.intelligence-filter-rail button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
 /* ========================================
    ALERTS VIEW
    ======================================== */

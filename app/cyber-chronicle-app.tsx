@@ -520,20 +520,15 @@ export function CyberChronicleApp({
       <div className="search-view-header">
         <h1>Intelligence Explorer</h1>
       </div>
-      <div className="search-suggestions" style={{ marginBottom: "16px" }}>
-        <strong>Filter by intelligence type</strong>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "8px" }}>
+      <div className="intelligence-filters">
+        <strong id="intelligence-filter-label">Filter by intelligence type</strong>
+        <div className="intelligence-filter-rail" role="toolbar" aria-labelledby="intelligence-filter-label">
           {["All", "Official Advisory", "High Severity", "Threat Intelligence", "Data Breach", "Vulnerability", "India", "AI & Technology"].map(filter => (
-            <button 
-              key={filter} 
+            <button
+              key={filter}
+              className={intelFilter === filter ? "active" : ""}
               onClick={() => setIntelFilter(filter)}
-              style={{ 
-                padding: "6px 12px", 
-                borderRadius: "16px", 
-                border: intelFilter === filter ? "1px solid var(--blue-600)" : "1px solid var(--border)",
-                background: intelFilter === filter ? "var(--blue-50)" : "transparent",
-                color: intelFilter === filter ? "var(--blue-700)" : "var(--foreground)"
-              }}
+              aria-pressed={intelFilter === filter}
             >
               {filter}
             </button>

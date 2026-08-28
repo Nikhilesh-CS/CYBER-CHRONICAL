@@ -119,6 +119,18 @@ test("trending sections use the same history-aware navigation path as the main n
   assert.match(app, /onClick=\{\(\) => handleDomainChange\(domain\)\}/);
 });
 
+test("intelligence filters use a single-row scrollable toolbar instead of inline wrapping", async () => {
+  const [app, css] = await Promise.all([
+    readFile(new URL("../app/cyber-chronicle-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /className="intelligence-filter-rail" role="toolbar"/);
+  assert.match(app, /aria-pressed=\{intelFilter === filter\}/);
+  assert.doesNotMatch(app, /flexWrap:\s*"wrap"/);
+  assert.match(css, /\.intelligence-filter-rail\s*\{[^}]*display:\s*flex[^}]*overflow-x:\s*auto/s);
+  assert.match(css, /\.intelligence-filter-rail button\s*\{[^}]*flex:\s*0 0 auto[^}]*white-space:\s*nowrap/s);
+});
+
 test("every source has a distinct HTTPS website destination", async () => {
   const definitions = getSourceDefinitions(2026);
   assert.ok(definitions.length > 0);
