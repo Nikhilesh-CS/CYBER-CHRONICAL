@@ -14,6 +14,10 @@ test("exports the Cyber Chronicle digital newspaper as static HTML", async () =>
   assert.match(html, /AI &amp; Emerging Technology/);
   assert.match(html, /Latest Feed/);
   assert.match(html, /Trust is the story/);
+  assert.match(html, /Built &amp; maintained by/);
+  assert.match(html, /linkedin\.com\/in\/nikhilesh-shingade-a42348383/);
+  assert.match(html, /github\.com\/Nikhilesh-CS/);
+  assert.match(html, /instagram\.com\/nikhilesh\._\.18/);
   assert.match(html, /Free edition/);
   assert.match(html, /\/CYBER-CHRONICAL\/data\/news\.json/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/i);

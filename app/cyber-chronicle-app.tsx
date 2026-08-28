@@ -19,6 +19,7 @@ import {
   DEFAULT_PREFERENCES, loadPreferences, meetsSeverityFloor, savePreferences,
   type AppPreferences,
 } from "../lib/preferences";
+import { CREATOR_LINKS, PROJECT } from "../lib/project";
 import { beginnerExplanation } from "../lib/explanations";
 import {
   isAppNavigationState, navigationStateFromUrl, navigationUrl,
@@ -815,6 +816,13 @@ export function CyberChronicleApp({
         <div><span>OUR PROMISE</span><h2>Trust is the story.</h2></div>
         <p>Cyber Chronicle separates confirmed facts from developing reports, shows the evidence behind every article, and never assigns risk or severity without source support.</p>
         <div className="standards-list"><span><Check size={16} />Original explanations</span><span><Check size={16} />Transparent sources</span><span><Check size={16} />No invented facts</span><span><Check size={16} />Plain-language reporting</span></div>
+        <div className="creator-signature">
+          <span>BUILT BY</span>
+          <div><strong>{PROJECT.creator.name}</strong><small>{PROJECT.creator.role} · {PROJECT.name}</small></div>
+          <nav className="creator-links" aria-label="Creator profiles">
+            {CREATOR_LINKS.map((link) => <a key={link.key} href={link.href} target="_blank" rel="noopener noreferrer">{link.label}<ExternalLink size={11} aria-hidden="true" /></a>)}
+          </nav>
+        </div>
       </section>
     </main>
   );
@@ -886,8 +894,9 @@ export function CyberChronicleApp({
       </PullToRefresh>
 
       <footer className="site-footer">
-        <div className="footer-brand"><strong>Cyber Chronicle</strong><span>Trusted Cybersecurity News. Simplified.</span></div>
+        <div className="footer-brand"><strong>{PROJECT.name}</strong><span>Trusted Cybersecurity News. Simplified.</span></div>
         <div><a href="#alerts">Security Alerts</a><a href="#standards">Editorial Standards</a><button onClick={() => void refresh(true)}>Refresh Edition</button></div>
+        <div className="footer-creator"><span>Built & maintained by <strong>{PROJECT.creator.name}</strong></span><nav aria-label="Creator profiles">{CREATOR_LINKS.map((link) => <a key={link.key} href={link.href} target="_blank" rel="noopener noreferrer">{link.label}<ExternalLink size={10} aria-hidden="true" /></a>)}</nav></div>
         <small>Live source metadata · Original plain-language explanations · Every story links to evidence</small>
       </footer>
 

@@ -7,6 +7,7 @@ const { computeDomain, computeState, matchesStoryQuery, storiesForDomain } = awa
 const { navigationStateFromUrl, navigationUrl, isAppNavigationState } = await import(new URL("../lib/navigation.ts", import.meta.url).href);
 const { parseRssFeed } = await import(new URL("../lib/parsers/rss.ts", import.meta.url).href);
 const { getSourceDefinitions } = await import(new URL("../lib/sources.ts", import.meta.url).href);
+const { CREATOR_LINKS, PROJECT } = await import(new URL("../lib/project.ts", import.meta.url).href);
 
 const source = {
   id: "science-test",
@@ -231,4 +232,24 @@ test("About intelligence flow uses responsive elements instead of preformatted t
   assert.match(view, /about-intelligence-flow/);
   assert.match(css, /@media \(max-width: 520px\)/);
   assert.match(css, /\.about-flow-sources, \.about-flow-process \{ grid-template-columns: 1fr;/);
+});
+
+test("creator identity and social destinations come from one shared project config", async () => {
+  assert.equal(PROJECT.creator.name, "Nikhilesh");
+  assert.equal(PROJECT.creator.role, "Founder & Developer");
+  assert.deepEqual(CREATOR_LINKS.map((link) => link.href), [
+    "https://www.linkedin.com/in/nikhilesh-shingade-a42348383/",
+    "https://github.com/Nikhilesh-CS",
+    "https://www.instagram.com/nikhilesh._.18/",
+  ]);
+  const [app, creator] = await Promise.all([
+    readFile(new URL("../app/cyber-chronicle-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/settings/views/CreatorView.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /CREATOR_LINKS\.map/);
+  assert.match(app, /className="creator-signature"/);
+  assert.match(app, /className="footer-creator"/);
+  assert.match(creator, /className="creator-connect"/);
+  assert.match(creator, /target="_blank" rel="noopener noreferrer"/);
+  assert.doesNotMatch(`${app}\n${creator}`, /linkedin\.com\/in\/nikhilesh|github\.com\/Nikhilesh-CS|instagram\.com\/nikhilesh/);
 });
