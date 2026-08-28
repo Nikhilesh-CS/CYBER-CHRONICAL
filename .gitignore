@@ -2,6 +2,9 @@
 
 # dependencies
 /node_modules
+/.npm-cache
+/.cache
+/.codex-push-*
 /.pnp
 .pnp.*
 .yarn/*

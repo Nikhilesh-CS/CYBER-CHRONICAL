@@ -157,6 +157,24 @@ export function intelligencePriority(item: RealIntelligenceItem): number {
   return score;
 }
 
+export function breakingScore(item: RealIntelligenceItem, now = Date.now(), corroborationVelocity = 0): number {
+  const publishedAt = Date.parse(item.publishedAt);
+  if (!Number.isFinite(publishedAt)) return 0;
+  const ageMinutes = Math.max(0, (now - publishedAt) / 60_000);
+  if (ageMinutes > 120) return 0;
+
+  const severity = item.metadata?.type === "cyber" ? item.metadata.severity : "Unknown";
+  const severityWeight = severity === "Critical" ? 55 : severity === "High" ? 42 : severity === "Medium" ? 24 : 0;
+  const recencyWeight = 35 * Math.pow(0.5, ageMinutes / 90);
+  const officialWeight = item.verificationStatus === "official" ? 15 : 0;
+  const corroborationWeight = Math.min(item.independentSourceCount * 4, 12) + Math.min(corroborationVelocity * 8, 16);
+  return severityWeight + recencyWeight + officialWeight + corroborationWeight;
+}
+
+export function isBreakingStory(item: RealIntelligenceItem, now = Date.now(), corroborationVelocity = 0) {
+  return breakingScore(item, now, corroborationVelocity) >= 70;
+}
+
 export function verificationLabel(item: RealIntelligenceItem) {
   if (item.verificationStatus === "official") return "Official source";
   if (item.verificationStatus === "corroborated") return `${item.independentSourceCount} sources confirm`;

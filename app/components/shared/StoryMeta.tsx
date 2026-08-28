@@ -2,7 +2,7 @@
 
 import { ShieldCheck } from "lucide-react";
 import type { RealIntelligenceItem } from "../../../lib/news";
-import { relativeTime, verificationLabel } from "../../../lib/editorial";
+import { relativeTime } from "../../../lib/editorial";
 
 export function StoryMeta({ item }: { item: RealIntelligenceItem }) {
   const confidenceStr = item.confidence ? `${item.confidence.toUpperCase()} CONFIDENCE` : "UNKNOWN CONFIDENCE";

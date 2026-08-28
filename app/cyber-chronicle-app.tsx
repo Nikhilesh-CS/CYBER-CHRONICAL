@@ -1,22 +1,23 @@
 "use client";
 
 import {
-  ArrowRight, Check, ChevronRight, Clock3, Download,
+  ArrowRight, Check, ChevronRight, Download,
   ExternalLink, Menu, Moon, RefreshCw, Search, ShieldCheck, Sun, X, Wifi, WifiOff,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import type { RealIntelligenceItem, RealIntelligenceResponse } from "../lib/news";
 import {
-  categorySlug, formatDate, plainTitle, relativeTime, verificationLabel,
-  computeDomain, computeIntelligenceType, intelligencePriority,
-  domains, type Domain, type IntelligenceType
+  formatDate, plainTitle, relativeTime, verificationLabel,
+  breakingScore, computeDomain, computeIntelligenceType, isBreakingStory,
+  domains, type Domain
 } from "../lib/editorial";
+import { learnFromStory, rankForReader, readInterestProfile, INTEREST_PROFILE_KEY } from "../lib/intelligence/client";
+import type { IntelligenceIndex, InterestProfile } from "../lib/intelligence/types";
 import { beginnerExplanation } from "../lib/explanations";
 import { NewsCard } from "./components/cards/NewsCard";
 import { ArticleReader } from "./components/article/ArticleReader";
-import { StoryMeta } from "./components/shared/StoryMeta";
 import { SectionHeading } from "./components/shared/SectionHeading";
-import { ShareButton } from "./components/shared/ShareButton";
 import { MobileTabBar, type MobileTab } from "./components/app-shell/MobileTabBar";
 import { PullToRefresh } from "./components/app-shell/PullToRefresh";
 import { NotificationManager } from "./components/app-shell/NotificationManager";
@@ -29,8 +30,6 @@ import { PrivacyView } from "./components/settings/views/PrivacyView";
 import { DisclaimerView } from "./components/settings/views/DisclaimerView";
 import { CreditsView } from "./components/settings/views/CreditsView";
 import { SettingsRow } from "./components/settings/SettingsRow";
-import { getMessagingInstance } from "../lib/firebase";
-import { onMessage } from "firebase/messaging";
 
 type InstallPrompt = Event & {
   prompt: () => Promise<void>;
@@ -66,12 +65,15 @@ export function CyberChronicleApp({
   const [readAlerts, setReadAlerts] = useState<string[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
-  const [foregroundAlert, setForegroundAlert] = useState<{ title: string, storyId: string } | null>(null);
+  const [appNotice, setAppNotice] = useState<string | null>(null);
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileTab>("home");
   const [isOnline, setIsOnline] = useState(true);
   const [intelFilter, setIntelFilter] = useState<string>("All");
   const [settingsPage, setSettingsPage] = useState<string>("hub");
+  const [intelligenceIndex, setIntelligenceIndex] = useState<IntelligenceIndex | null>(null);
+  const [interestProfile, setInterestProfile] = useState<InterestProfile | null>(null);
+  const [rankingNow, setRankingNow] = useState(() => Date.now());
 
   const refresh = useCallback(async (force = false) => {
     setIsRefreshing(true);
@@ -97,6 +99,7 @@ export function CyberChronicleApp({
     const storedSaved = window.localStorage.getItem("cyber-chronicle-saved");
     const storedReadAlerts = window.localStorage.getItem("cyber-chronicle-read-alerts");
     const restore = window.setTimeout(() => {
+      setIsOnline(navigator.onLine);
       if (storedTheme === "dark") {
         setTheme("dark");
         document.documentElement.dataset.theme = "dark";
@@ -119,11 +122,8 @@ export function CyberChronicleApp({
     };
     window.addEventListener("beforeinstallprompt", onInstall);
     if ("serviceWorker" in navigator) {
-      const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-      const swParams = apiKey ? `?apiKey=${apiKey}&projectId=${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}&messagingSenderId=${process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}&appId=${process.env.NEXT_PUBLIC_FIREBASE_APP_ID}` : "";
-      void navigator.serviceWorker.register(`${serviceWorkerUrl}${swParams}`, { updateViaCache: "none" });
+      void navigator.serviceWorker.register(serviceWorkerUrl, { updateViaCache: "none" });
     }
-    setIsOnline(navigator.onLine);
     return () => {
       window.clearTimeout(restore);
       window.clearInterval(timer);
@@ -131,6 +131,34 @@ export function CyberChronicleApp({
       window.removeEventListener("beforeinstallprompt", onInstall);
     };
   }, [refresh, serviceWorkerUrl]);
+
+  useEffect(() => {
+    const checkForLocalNotifications = async () => {
+      if (!("serviceWorker" in navigator)) return;
+      const registration = await navigator.serviceWorker.ready;
+      registration.active?.postMessage({ type: "CHECK_LOCAL_NOTIFICATIONS", items: data.items });
+    };
+    void checkForLocalNotifications();
+    window.addEventListener("cyber-chronicle-notifications-configured", checkForLocalNotifications);
+    return () => window.removeEventListener("cyber-chronicle-notifications-configured", checkForLocalNotifications);
+  }, [data.items]);
+
+  useEffect(() => {
+    const intelligenceUrl = dataUrl.replace(/news\.json(?:\?.*)?$/, "intelligence.json");
+    const separator = intelligenceUrl.includes("?") ? "&" : "?";
+    let cancelled = false;
+    void fetch(`${intelligenceUrl}${separator}t=${Date.now()}`, { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload: IntelligenceIndex | null) => { if (!cancelled && payload?.stories) setIntelligenceIndex(payload); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [data.generatedAt, dataUrl]);
+
+  useEffect(() => {
+    const restore = window.setTimeout(() => setInterestProfile(readInterestProfile()), 0);
+    const timer = window.setInterval(() => setRankingNow(Date.now()), 60_000);
+    return () => { window.clearTimeout(restore); window.clearInterval(timer); };
+  }, []);
 
   useEffect(() => {
     document.body.style.overflow = selected ? "hidden" : "";
@@ -155,13 +183,8 @@ export function CyberChronicleApp({
   );
   
   const intelligenceOrdered = useMemo(
-    () => [...data.items].sort((a, b) => {
-      const pA = intelligencePriority(a);
-      const pB = intelligencePriority(b);
-      if (pA !== pB) return pB - pA;
-      return Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
-    }),
-    [data.items],
+    () => rankForReader(data.items, intelligenceIndex, interestProfile),
+    [data.items, intelligenceIndex, interestProfile],
   );
 
   const filtered = useMemo(() => {
@@ -173,7 +196,13 @@ export function CyberChronicleApp({
     });
   }, [activeDomain, ordered, query]);
 
-  const hero = intelligenceOrdered[0] ?? ordered[0];
+  const breakingStories = useMemo(() => intelligenceOrdered
+    .filter((item) => isBreakingStory(item, rankingNow, intelligenceIndex?.stories[item.id]?.corroborationVelocity || 0))
+    .sort((left, right) => breakingScore(right, rankingNow, intelligenceIndex?.stories[right.id]?.corroborationVelocity || 0)
+      - breakingScore(left, rankingNow, intelligenceIndex?.stories[left.id]?.corroborationVelocity || 0)),
+  [intelligenceIndex, intelligenceOrdered, rankingNow]);
+  const breakingStory = breakingStories[0] ?? null;
+  const hero = breakingStory ?? intelligenceOrdered[0] ?? ordered[0];
   const briefingStories = intelligenceOrdered.filter(item => item.id !== hero?.id).slice(0, 4);
 
   const activeThreats = intelligenceOrdered.filter(item => computeIntelligenceType(item) === "Official Advisory" || (item.metadata?.type === "cyber" && (item.metadata.severity === "Critical" || item.metadata.severity === "High"))).slice(0, 4);
@@ -184,16 +213,11 @@ export function CyberChronicleApp({
   const india = ordered.filter(item => computeDomain(item) === "India").slice(0, 4);
   const globalIntel = ordered.filter(item => computeDomain(item) === "World" || computeDomain(item) === "Business").slice(0, 4);
   const enterprise = ordered.filter(item => computeIntelligenceType(item) === "Industry News" || computeDomain(item) === "Business").slice(0, 4);
-  const scienceSpace = ordered.filter(item => computeDomain(item) === "Science" || computeDomain(item) === "Space").slice(0, 4);
 
   const latestFeed = ordered.slice(0, 10);
 
   // Still keeping these for Alerts view and some legacy parts
   const alerts = intelligenceOrdered.filter((item) => computeIntelligenceType(item) === "Official Advisory").slice(0, 20);
-  const editorPicks = ordered.filter((item) => item.verificationStatus !== "single-source").slice(0, 3);
-  const editionTime = Date.parse(data.generatedAt);
-  const weeklyCutoff = Number.isFinite(editionTime) ? editionTime - 7 * 24 * 60 * 60 * 1_000 : 0;
-  const weeklyHighlights = ordered.filter((item) => Date.parse(item.publishedAt) >= weeklyCutoff).slice(8, 12);
   const currentSources = data.sources.filter((source) => source.status === "current").length;
   const savedItems = ordered.filter((item) => saved.includes(item.id));
 
@@ -207,12 +231,24 @@ export function CyberChronicleApp({
   const toggleSaved = (id: string) => {
     setSaved((current) => {
       const next = current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id];
+      if (!current.includes(id)) recordInterest(id, 3);
       window.localStorage.setItem("cyber-chronicle-saved", JSON.stringify(next));
       return next;
     });
   };
 
+  const recordInterest = (id: string, weight = 1) => {
+    const vector = intelligenceIndex?.stories[id]?.vector;
+    if (!vector) return;
+    setInterestProfile((current) => {
+      const next = learnFromStory(current, vector, weight);
+      window.localStorage.setItem(INTEREST_PROFILE_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
   const markAsRead = (item: RealIntelligenceItem) => {
+    recordInterest(item.id, 1);
     setSelected(item);
     if (computeIntelligenceType(item) === "Official Advisory" && !readAlerts.includes(item.id)) {
       setReadAlerts((current) => {
@@ -227,8 +263,7 @@ export function CyberChronicleApp({
     let item = data.items.find(x => x.id === storyId);
     if (!item) {
       try {
-        const separator = dataUrl.includes("?") ? "&" : "?";
-        const response = await fetch(`${dataUrl}${separator}t=${Date.now()}`, { cache: "no-store", headers: { accept: "application/json" } });
+        const response = await fetch(dataUrl, { cache: "no-store", headers: { accept: "application/json" } });
         const payload = await response.json() as RealIntelligenceResponse;
         if (payload && Array.isArray(payload.items)) {
           item = payload.items.find(x => x.id === storyId);
@@ -241,16 +276,15 @@ export function CyberChronicleApp({
     if (item) {
       markAsRead(item);
     } else {
-      alert("This story isn't available in your saved edition.");
+      setAppNotice("This story is no longer available in the current edition.");
     }
   }, [data.items, dataUrl, readAlerts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const storyId = params.get("story");
-    if (storyId) {
-      void openStoryById(storyId);
-    }
+    const timeout = storyId ? window.setTimeout(() => void openStoryById(storyId), 0) : null;
+    return () => { if (timeout !== null) window.clearTimeout(timeout); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -267,19 +301,6 @@ export function CyberChronicleApp({
     navigator.serviceWorker?.addEventListener("message", handleMessage);
     return () => navigator.serviceWorker?.removeEventListener("message", handleMessage);
   }, [openStoryById]);
-
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    getMessagingInstance().then((msg) => {
-      if (!msg) return;
-      unsubscribe = onMessage(msg, (payload) => {
-        if (payload.data && payload.data.title && payload.data.storyId) {
-          setForegroundAlert({ title: payload.data.title, storyId: payload.data.storyId });
-        }
-      });
-    });
-    return () => unsubscribe?.();
-  }, []);
 
   const install = async () => {
     if (!installPrompt) return;
@@ -319,6 +340,10 @@ export function CyberChronicleApp({
       </main>
     );
   }
+
+  const relatedItems = (intelligenceIndex?.stories[selected?.id || ""]?.relatedIds || [])
+    .map((id) => data.items.find((item) => item.id === id))
+    .filter((item): item is RealIntelligenceItem => Boolean(item));
 
   /* ---- Settings View ---- */
   const settingsHub = (
@@ -411,15 +436,12 @@ export function CyberChronicleApp({
   );
 
   /* ---- Intelligence View ---- */
-  const intelList = useMemo(() => {
-    let list = intelligenceOrdered;
-    if (intelFilter === "High Severity") {
-      list = list.filter(item => item.metadata?.type === "cyber" && (item.metadata.severity === "Critical" || item.metadata.severity === "High"));
-    } else if (intelFilter !== "All") {
-      list = list.filter(item => computeIntelligenceType(item) === intelFilter || computeDomain(item) === intelFilter);
-    }
-    return list;
-  }, [intelligenceOrdered, intelFilter]);
+  let intelList = intelligenceOrdered;
+  if (intelFilter === "High Severity") {
+    intelList = intelList.filter(item => item.metadata?.type === "cyber" && (item.metadata.severity === "Critical" || item.metadata.severity === "High"));
+  } else if (intelFilter !== "All") {
+    intelList = intelList.filter(item => computeIntelligenceType(item) === intelFilter || computeDomain(item) === intelFilter);
+  }
 
   const intelligenceView = (
     <div className="search-view">
@@ -478,6 +500,12 @@ export function CyberChronicleApp({
   /* ---- Home Feed ---- */
   const homeFeed = (
     <main className="news-home">
+      {interestProfile && interestProfile.engagementCount >= 2 && (
+        <motion.div className="interest-strip" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
+          <span>FOR YOU</span>
+          <p>Stories are now balanced using your reading and saved-story interests. Critical alerts always keep editorial priority.</p>
+        </motion.div>
+      )}
       {(query || activeDomain !== "Latest") && (
         <div className="results-banner">
           <div><span>Viewing</span><h1>{query ? `Search: "${query}"` : activeDomain}</h1></div>
@@ -485,7 +513,8 @@ export function CyberChronicleApp({
         </div>
       )}
 
-      <section className="lead-grid" aria-label="Lead stories">
+      <section className={`lead-grid ${breakingStory ? "lead-grid-breaking" : ""}`} aria-label="Lead stories">
+        {breakingStory && <motion.div className="breaking-hero-label" initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}><i />LIVE BREAKING INTELLIGENCE</motion.div>}
         <NewsCard
           item={hero}
           variant="lead"
@@ -612,6 +641,7 @@ export function CyberChronicleApp({
   })();
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="publication-shell">
       {!isOnline && (
         <div className="offline-banner">
@@ -646,20 +676,19 @@ export function CyberChronicleApp({
           ))}
         </nav>
 
-        <div className="breaking-strip">
-          <strong>BREAKING</strong>
+        <motion.div
+          key={breakingStory?.id || hero.id}
+          className={`breaking-strip ${breakingStory ? "breaking-active" : "breaking-latest"}`}
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28 }}
+        >
+          <strong>{breakingStory ? "BREAKING" : "LATEST"}</strong>
           <button onClick={() => markAsRead(hero)}><span>{plainTitle(hero)}</span><ChevronRight size={15} /></button>
           <small>{relativeTime(hero.publishedAt)}</small>
-        </div>
+        </motion.div>
         {refreshMessage && <div className="refresh-note"><Check size={15} />{refreshMessage}<button onClick={() => setRefreshMessage(null)} aria-label="Dismiss update message"><X size={14} /></button></div>}
-        {foregroundAlert && (
-          <div className="refresh-note alert-banner" style={{ backgroundColor: "var(--red-900)", color: "white", borderColor: "var(--red-700)" }}>
-            <ShieldCheck size={15} />
-            <span style={{ flex: 1 }}><strong>New Alert</strong>: {foregroundAlert.title.replace('⚠️ ', '')}</span>
-            <button style={{ background: "white", color: "var(--red-900)", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: "bold" }} onClick={() => { setForegroundAlert(null); void openStoryById(foregroundAlert.storyId); }}>Open story</button>
-            <button onClick={() => setForegroundAlert(null)} aria-label="Dismiss"><X size={14} /></button>
-          </div>
-        )}
+        <AnimatePresence>{appNotice && <motion.div className="refresh-note alert-banner" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}><ShieldCheck size={15} /><span style={{ flex: 1 }}>{appNotice}</span><button onClick={() => setAppNotice(null)} aria-label="Dismiss"><X size={14} /></button></motion.div>}</AnimatePresence>
       </header>
 
       <PullToRefresh onRefresh={() => refresh(true)}>
@@ -680,7 +709,7 @@ export function CyberChronicleApp({
       />
 
       {selected && (
-        <ArticleReader item={selected} saved={saved.includes(selected.id)} onSave={() => toggleSaved(selected.id)} onClose={() => {
+        <ArticleReader key={selected.id} item={selected} relatedItems={relatedItems} onOpenRelated={markAsRead} saved={saved.includes(selected.id)} onSave={() => toggleSaved(selected.id)} onClose={() => {
           setSelected(null);
           const url = new URL(window.location.href);
           url.searchParams.delete("story");
@@ -688,5 +717,6 @@ export function CyberChronicleApp({
         }} />
       )}
     </div>
+    </MotionConfig>
   );
 }

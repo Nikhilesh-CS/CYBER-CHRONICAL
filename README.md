@@ -17,6 +17,10 @@ This branch is designed to run for **₹0** on GitHub Pages:
 
 GitHub Actions retrieves source metadata on a schedule, creates a static JSON edition, and publishes static HTML, CSS, JavaScript, images, and JSON. When the scheduled updater is not running, the last successfully built edition remains readable.
 
+Optional notifications are also local-first: the installed app compares each refreshed static edition with story identifiers stored on the device and displays matching alerts. No subscriber account, cloud messaging token, or notification database is used. Background checks depend on browser support and are best effort; opening or focusing the app always triggers the normal refresh path.
+
+The scheduled build also runs a free local MiniLM embedding model. Semantic vectors and related-story links are published as `public/data/intelligence.json`; the browser learns an interest profile from opened and saved stories entirely in local storage. Personalized ranking is blended with editorial priority, so critical and verified reporting cannot be hidden by reader affinity. Breaking treatment uses severity, recency decay, source corroboration, and source-count velocity, and expires after two hours.
+
 ## How updates work
 
 1. The scheduled workflow checks the fixed reviewed source list.

@@ -1,11 +1,12 @@
 "use client";
 
 import { Bookmark, BookmarkCheck } from "lucide-react";
+import { motion } from "motion/react";
 import type { RealIntelligenceItem } from "../../../lib/news";
-import { plainTitle, categorySlug, computeDomain, computeIntelligenceType } from "../../../lib/editorial";
+import { plainTitle, computeDomain, computeIntelligenceType } from "../../../lib/editorial";
 import { beginnerExplanation } from "../../../lib/explanations";
 import { StoryMeta } from "../shared/StoryMeta";
-import { StoryImage } from "../shared/StoryImage";
+import { StoryImage, type ImageVariant } from "../shared/StoryImage";
 
 export type CardVariant = "lead" | "feature" | "standard" | "compact" | "alert" | "text-only";
 
@@ -41,14 +42,21 @@ export function NewsCard({
   }
 
   return (
-    <article className={`news-card news-card-${finalVariant}`}>
+    <motion.article
+      layout
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -3 }}
+      transition={{ duration: 0.24 }}
+      className={`news-card news-card-${finalVariant}`}
+    >
       <button className="card-hitbox" onClick={onOpen} aria-label={`Read ${plainTitle(item)}`} />
       
       {finalVariant !== "text-only" && finalVariant !== "alert" && (
         <StoryImage 
           src={item.imageUrl} 
           alt={plainTitle(item)} 
-          variant={finalVariant as any} 
+          variant={finalVariant as ImageVariant}
           intelligenceType={intelType} 
           domain={domain} 
         />
@@ -68,6 +76,6 @@ export function NewsCard({
         {finalVariant === "alert" && <p className="alert-desc">{beginnerExplanation(item)}</p>}
         <StoryMeta item={item} />
       </div>
-    </article>
+    </motion.article>
   );
 }

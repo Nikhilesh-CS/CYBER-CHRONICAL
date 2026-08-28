@@ -4,10 +4,11 @@ import {
   ArrowRight, Bookmark, BookmarkCheck, Check, Clock3,
   ExternalLink, X,
 } from "lucide-react";
+import { motion } from "motion/react";
 import type { RealIntelligenceItem } from "../../../lib/news";
 import {
   formatDate, plainTitle, practicalActions,
-  readerGuidance, simpleSummary, verificationLabel, whyItMatters,
+  readerGuidance, simpleSummary, whyItMatters,
   computeIntelligenceType
 } from "../../../lib/editorial";
 import { beginnerExplanation } from "../../../lib/explanations";
@@ -15,11 +16,13 @@ import { jargonFor } from "../../../lib/jargon";
 import { StoryMeta } from "../shared/StoryMeta";
 import { ShareButton } from "../shared/ShareButton";
 
-export function ArticleReader({ item, saved, onSave, onClose }: {
+export function ArticleReader({ item, relatedItems, saved, onSave, onClose, onOpenRelated }: {
   item: RealIntelligenceItem;
+  relatedItems: RealIntelligenceItem[];
   saved: boolean;
   onSave: () => void;
   onClose: () => void;
+  onOpenRelated: (item: RealIntelligenceItem) => void;
 }) {
   const guidance = readerGuidance(item);
   const jargon = jargonFor(item);
@@ -27,8 +30,8 @@ export function ArticleReader({ item, saved, onSave, onClose }: {
   const explanation = beginnerExplanation(item);
 
   return (
-    <div className="article-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <article className="article-reader" role="dialog" aria-modal="true" aria-labelledby="article-title">
+    <motion.div className="article-overlay" role="presentation" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <motion.article className="article-reader" role="dialog" aria-modal="true" aria-labelledby="article-title" initial={{ x: 48 }} animate={{ x: 0 }} transition={{ type: "spring", stiffness: 340, damping: 34 }}>
         <div className="article-toolbar">
           <button onClick={onClose}><X size={20} />Close</button>
           <span>CYBER CHRONICLE</span>
@@ -40,11 +43,13 @@ export function ArticleReader({ item, saved, onSave, onClose }: {
         <div className="article-body">
           <header className="article-header">
             {item.imageUrl && (
-              <img
+              <motion.img
                 src={item.imageUrl}
                 alt={title}
                 className="article-hero-image news-image"
                 loading="eager"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = "none";
                 }}
@@ -130,13 +135,39 @@ export function ArticleReader({ item, saved, onSave, onClose }: {
             </div>
           </section>
 
+          {relatedItems.length > 0 && (
+            <section className="article-block related-coverage">
+              <span>CONNECTED INTELLIGENCE</span>
+              <h2>Related coverage</h2>
+              <p>Semantically linked reports that add context, corroboration, or another angle.</p>
+              <div className="related-story-graph">
+                <div className="related-story-hub"><b>Current</b><small>{computeIntelligenceType(item)}</small></div>
+                {relatedItems.map((related, index) => (
+                  <motion.button
+                    key={related.id}
+                    className="related-story-node"
+                    initial={{ opacity: 0, scale: 0.92 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: index * 0.05 }}
+                    onClick={() => onOpenRelated(related)}
+                  >
+                    <small>{computeIntelligenceType(related)}</small>
+                    <strong>{plainTitle(related)}</strong>
+                    <span>{related.primaryPublisher}<ArrowRight size={14} /></span>
+                  </motion.button>
+                ))}
+              </div>
+            </section>
+          )}
+
           <div className="article-share-cta">
             <ShareButton title={title} text={explanation} variant="button" />
           </div>
 
           <div className="article-end"><span>CC</span><p>Cyber Chronicle — Trusted Cybersecurity News. Simplified.</p></div>
         </div>
-      </article>
-    </div>
+      </motion.article>
+    </motion.div>
   );
 }

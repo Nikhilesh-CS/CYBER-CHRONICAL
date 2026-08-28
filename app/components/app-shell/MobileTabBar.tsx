@@ -1,6 +1,7 @@
 "use client";
 
 import { Home, Bell, Activity, Bookmark, Settings } from "lucide-react";
+import { motion } from "motion/react";
 
 export type MobileTab = "home" | "alerts" | "intelligence" | "saved" | "settings";
 
@@ -33,6 +34,7 @@ export function MobileTabBar({
           aria-label={label}
           aria-current={active === id ? "page" : undefined}
         >
+          {active === id && <motion.i className="tab-motion-indicator" layoutId="mobile-tab-indicator" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
           <span className="tab-icon-wrap">
             <Icon size={20} strokeWidth={active === id ? 2.2 : 1.6} />
             {badge ? <b className="tab-badge">{badge > 99 ? "99+" : badge}</b> : null}
