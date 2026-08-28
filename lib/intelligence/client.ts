@@ -41,12 +41,21 @@ export function learnFromStory(current: InterestProfile | null, storyVector: num
   return { vector: normalize(vector), engagementCount: total, updatedAt: new Date().toISOString() };
 }
 
-export function rankForReader(items: RealIntelligenceItem[], index: IntelligenceIndex | null, profile: InterestProfile | null) {
+export function rankForReader(
+  items: RealIntelligenceItem[],
+  index: IntelligenceIndex | null,
+  profile: InterestProfile | null,
+  followedState: string | null = null,
+) {
   return [...items].sort((left, right) => {
     const editorialDifference = intelligencePriority(right) - intelligencePriority(left);
-    if (!index || !profile || profile.engagementCount < 2) return editorialDifference;
-    const leftAffinity = cosineSimilarity(profile.vector, index.stories[left.id]?.vector);
-    const rightAffinity = cosineSimilarity(profile.vector, index.stories[right.id]?.vector);
-    return (editorialDifference * 0.72) + ((rightAffinity - leftAffinity) * 34);
+    const hasInterestProfile = Boolean(index && profile && profile.engagementCount >= 2);
+    const hasStatePreference = Boolean(followedState);
+    if (!hasInterestProfile && !hasStatePreference) return editorialDifference;
+    const leftAffinity = hasInterestProfile ? cosineSimilarity(profile?.vector, index?.stories[left.id]?.vector) : 0;
+    const rightAffinity = hasInterestProfile ? cosineSimilarity(profile?.vector, index?.stories[right.id]?.vector) : 0;
+    const leftStateBonus = followedState && left.state === followedState ? 12 : 0;
+    const rightStateBonus = followedState && right.state === followedState ? 12 : 0;
+    return (editorialDifference * 0.72) + ((rightAffinity - leftAffinity) * 34) + rightStateBonus - leftStateBonus;
   });
 }

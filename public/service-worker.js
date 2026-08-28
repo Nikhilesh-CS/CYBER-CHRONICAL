@@ -1,10 +1,10 @@
-const STATIC_CACHE = "cyber-chronicle-static-v3";
+const STATIC_CACHE = "cyber-chronicle-static-v4";
 const DATA_CACHE = "cyber-chronicle-data-v1";
 const OFFLINE_CACHE = "cyber-chronicle-offline-v1";
 const NOTIFICATION_CACHE = "cyber-chronicle-notifications-v1";
 const NOTIFICATION_STATE_URL = new URL(".notification-state", self.registration.scope).href;
 let notificationWork = Promise.resolve();
-const DEFAULT_PREFERENCES = {
+const DEFAULT_NOTIFICATION_TOPICS = {
   criticalAlerts: true,
   highSeverityAlerts: true,
   officialAdvisories: true,
@@ -13,6 +13,23 @@ const DEFAULT_PREFERENCES = {
   aiTechUpdates: false,
   generalNews: false,
 };
+const DEFAULT_PREFERENCES = {
+  enabledDomains: ["Cybersecurity", "AI & Technology", "Business", "Markets", "World", "India", "Science", "Space", "Environment", "Sports", "Entertainment"],
+  severityFloor: "all",
+  followedState: null,
+  notifications: DEFAULT_NOTIFICATION_TOPICS,
+};
+
+function normalizePreferences(value) {
+  const input = value && typeof value === "object" ? value : {};
+  const legacyTopics = input.notifications && typeof input.notifications === "object" ? input.notifications : input;
+  return {
+    enabledDomains: Array.isArray(input.enabledDomains) && input.enabledDomains.length ? input.enabledDomains : DEFAULT_PREFERENCES.enabledDomains,
+    severityFloor: input.severityFloor === "high" || input.severityFloor === "critical" ? input.severityFloor : "all",
+    followedState: typeof input.followedState === "string" && input.followedState ? input.followedState : null,
+    notifications: { ...DEFAULT_NOTIFICATION_TOPICS, ...legacyTopics },
+  };
+}
 
 function enqueueNotificationWork(task) {
   notificationWork = notificationWork.catch(() => undefined).then(task);
@@ -125,7 +142,8 @@ async function readNotificationState() {
   const response = await cache.match(NOTIFICATION_STATE_URL);
   if (!response) return { enabled: false, initialized: false, preferences: DEFAULT_PREFERENCES, seenIds: [] };
   try {
-    return { preferences: DEFAULT_PREFERENCES, seenIds: [], initialized: false, ...(await response.json()) };
+    const stored = await response.json();
+    return { seenIds: [], initialized: false, ...stored, preferences: normalizePreferences(stored.preferences) };
   } catch {
     return { enabled: false, initialized: false, preferences: DEFAULT_PREFERENCES, seenIds: [] };
   }
@@ -154,6 +172,37 @@ function classify(item) {
   return { type: "NEWS_UPDATE", preference: "generalNews", title: "📰 CYBER CHRONICLE" };
 }
 
+function itemDomain(item) {
+  if (typeof item.domain === "string" && item.domain) return item.domain;
+  const categories = Array.isArray(item.categories) ? item.categories : [];
+  if (categories.includes("cyber")) return "Cybersecurity";
+  if (categories.includes("space")) return "Space";
+  if (categories.includes("ai") || categories.includes("technology")) return "AI & Technology";
+  if (categories.includes("environment")) return "Environment";
+  if (categories.includes("sports")) return "Sports";
+  if (categories.includes("entertainment")) return "Entertainment";
+  if (categories.includes("markets")) return "Markets";
+  if (categories.includes("science")) return "Science";
+  if (categories.includes("business")) return "Business";
+  if (item.region === "india" || categories.includes("india")) return "India";
+  return "World";
+}
+
+function meetsSeverityFloor(item, floor) {
+  if (floor === "all") return true;
+  const severity = item.metadata?.type === "cyber" ? item.metadata.severity : undefined;
+  if (floor === "critical") return severity === "Critical";
+  return severity === "Critical" || severity === "High";
+}
+
+function matchesPreferences(item, preferences) {
+  const normalized = normalizePreferences(preferences);
+  const classification = classify(item);
+  return normalized.enabledDomains.includes(itemDomain(item))
+    && meetsSeverityFloor(item, normalized.severityFloor)
+    && Boolean(normalized.notifications[classification.preference]);
+}
+
 async function processNotificationItems(items) {
   if (!Array.isArray(items)) return;
   const state = await readNotificationState();
@@ -167,7 +216,11 @@ async function processNotificationItems(items) {
 
   const seen = new Set(state.seenIds || []);
   const newItems = items.filter((item) => item?.id && !seen.has(item.id));
-  const eligible = newItems.filter((item) => state.preferences?.[classify(item).preference]).slice(0, 3);
+  const preferences = normalizePreferences(state.preferences);
+  const eligible = newItems
+    .filter((item) => matchesPreferences(item, preferences))
+    .sort((left, right) => Number(right.state === preferences.followedState) - Number(left.state === preferences.followedState))
+    .slice(0, 3);
   for (const item of eligible) {
     const classification = classify(item);
     const severity = item.metadata?.type === "cyber" ? item.metadata.severity || "Unknown" : "Unknown";
@@ -192,7 +245,7 @@ self.addEventListener("message", (event) => {
     notificationWork = enqueueNotificationWork(() => readNotificationState().then((state) => writeNotificationState({
         ...state,
         enabled: Boolean(event.data.enabled),
-        preferences: { ...DEFAULT_PREFERENCES, ...(event.data.preferences || {}) },
+        preferences: normalizePreferences(event.data.preferences),
       })));
     event.waitUntil(notificationWork);
   }

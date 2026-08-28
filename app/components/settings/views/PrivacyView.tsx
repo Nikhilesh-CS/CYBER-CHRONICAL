@@ -9,13 +9,18 @@ export function PrivacyView({ onBack }: { onBack: () => void }) {
       <div className="settings-page-content">
         <InfoBlock>
           <p>
-            Cyber Chronicle stores notification settings on this device. It does not create an account, upload a notification token, or maintain a subscriber database.
+            Cyber Chronicle stores news and notification preferences on this device. It does not create an account, upload a notification token, or maintain a subscriber database.
           </p>
         </InfoBlock>
 
         <InfoBlock>
           <p><strong>Local-only settings</strong></p>
-          <p style={{ color: "var(--ink-soft)" }}>Your notification preferences and the identifiers of stories already checked are kept in browser storage on this device.</p>
+          <p style={{ color: "var(--ink-soft)" }}>Your enabled domains, severity choice, followed state, notification topics, and the identifiers of stories already checked are kept in browser storage on this device.</p>
+        </InfoBlock>
+
+        <InfoBlock>
+          <p><strong>Location stays private</strong></p>
+          <p style={{ color: "var(--ink-soft)" }}>Location is requested only after you tap the opt-in button. Coordinates are resolved locally and immediately discarded; only the resulting state name is saved.</p>
         </InfoBlock>
 
         <InfoBlock>

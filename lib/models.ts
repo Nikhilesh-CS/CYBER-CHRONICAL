@@ -39,6 +39,8 @@ export type RealIntelligenceItem = {
 
   categories: NewsCategory[];
   region: "india" | "global" | "regional";
+  domain?: string;
+  state?: string;
 
   primaryPublisher: string;
 

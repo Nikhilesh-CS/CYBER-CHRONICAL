@@ -2,7 +2,7 @@
 
 import {
   ArrowRight, Check, ChevronRight, Download,
-  ExternalLink, Menu, Moon, RefreshCw, Search, ShieldCheck, Sun, X, Wifi, WifiOff,
+  ExternalLink, Menu, Moon, RefreshCw, Search, ShieldCheck, SlidersHorizontal, Sun, X, Wifi, WifiOff,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
@@ -14,6 +14,11 @@ import {
 } from "../lib/editorial";
 import { learnFromStory, rankForReader, readInterestProfile, INTEREST_PROFILE_KEY } from "../lib/intelligence/client";
 import type { IntelligenceIndex, InterestProfile } from "../lib/intelligence/types";
+import { resolveState } from "../lib/geo/resolveState";
+import {
+  DEFAULT_PREFERENCES, loadPreferences, meetsSeverityFloor, savePreferences,
+  type AppPreferences,
+} from "../lib/preferences";
 import { beginnerExplanation } from "../lib/explanations";
 import {
   isAppNavigationState, navigationStateFromUrl, navigationUrl,
@@ -33,6 +38,7 @@ import { SourcesView } from "./components/settings/views/SourcesView";
 import { PrivacyView } from "./components/settings/views/PrivacyView";
 import { DisclaimerView } from "./components/settings/views/DisclaimerView";
 import { CreditsView } from "./components/settings/views/CreditsView";
+import { PreferencesView } from "./components/settings/views/PreferencesView";
 import { SettingsRow } from "./components/settings/SettingsRow";
 
 type InstallPrompt = Event & {
@@ -77,6 +83,10 @@ export function CyberChronicleApp({
   const [settingsPage, setSettingsPage] = useState<SettingsPage>("hub");
   const [intelligenceIndex, setIntelligenceIndex] = useState<IntelligenceIndex | null>(null);
   const [interestProfile, setInterestProfile] = useState<InterestProfile | null>(null);
+  const [preferences, setPreferences] = useState<AppPreferences>(DEFAULT_PREFERENCES);
+  const [locating, setLocating] = useState(false);
+  const [locationMessage, setLocationMessage] = useState<string | null>(null);
+  const [stateOnly, setStateOnly] = useState(false);
   const [rankingNow, setRankingNow] = useState(() => Date.now());
   const historyInitialized = useRef(false);
 
@@ -105,6 +115,7 @@ export function CyberChronicleApp({
     const storedReadAlerts = window.localStorage.getItem("cyber-chronicle-read-alerts");
     const restore = window.setTimeout(() => {
       setIsOnline(navigator.onLine);
+      setPreferences(loadPreferences(window.localStorage));
       if (storedTheme === "dark") {
         setTheme("dark");
         document.documentElement.dataset.theme = "dark";
@@ -179,19 +190,32 @@ export function CyberChronicleApp({
     };
   }, [selected]);
 
-  const ordered = useMemo(
+  const preferenceFilteredItems = useMemo(() => data.items.filter((item) => {
+    const domain = computeDomain(item);
+    const severity = item.metadata?.type === "cyber" ? item.metadata.severity : undefined;
+    return preferences.enabledDomains.includes(domain) && meetsSeverityFloor(severity, preferences.severityFloor);
+  }), [data.items, preferences.enabledDomains, preferences.severityFloor]);
+
+  const allOrdered = useMemo(
     () => [...data.items].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
     [data.items],
   );
+
+  const ordered = useMemo(
+    () => [...preferenceFilteredItems].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
+    [preferenceFilteredItems],
+  );
   
   const intelligenceOrdered = useMemo(
-    () => rankForReader(data.items, intelligenceIndex, interestProfile),
-    [data.items, intelligenceIndex, interestProfile],
+    () => rankForReader(preferenceFilteredItems, intelligenceIndex, interestProfile, preferences.followedState),
+    [preferenceFilteredItems, intelligenceIndex, interestProfile, preferences.followedState],
   );
 
   const domainStories = useMemo(
-    () => storiesForDomain(intelligenceOrdered, activeDomain),
-    [activeDomain, intelligenceOrdered],
+    () => stateOnly && preferences.followedState
+      ? intelligenceOrdered.filter((item) => item.state === preferences.followedState)
+      : storiesForDomain(intelligenceOrdered, activeDomain),
+    [activeDomain, intelligenceOrdered, preferences.followedState, stateOnly],
   );
   const filtered = useMemo(
     () => domainStories.filter((item) => matchesStoryQuery(item, query)),
@@ -206,7 +230,7 @@ export function CyberChronicleApp({
   const breakingStory = breakingStories[0] ?? null;
   const activeBreakingStory = breakingStories.find((story) => filtered.some((item) => item.id === story.id)) ?? null;
   const hero = activeBreakingStory ?? filtered[0] ?? null;
-  const editionHero = breakingStory ?? intelligenceOrdered[0] ?? ordered[0] ?? null;
+  const editionHero = breakingStory ?? intelligenceOrdered[0] ?? ordered[0] ?? allOrdered[0] ?? null;
   const headlineStory = hero ?? editionHero;
   const briefingStories = filtered.filter(item => item.id !== hero?.id).slice(0, 4);
   const leadStoryIds = new Set([hero?.id, ...briefingStories.map((item) => item.id)].filter(Boolean));
@@ -227,7 +251,12 @@ export function CyberChronicleApp({
   // Still keeping these for Alerts view and some legacy parts
   const alerts = intelligenceOrdered.filter((item) => computeIntelligenceType(item) === "Official Advisory").slice(0, 20);
   const currentSources = data.sources.filter((source) => source.status === "current").length;
-  const savedItems = ordered.filter((item) => saved.includes(item.id));
+  const savedItems = allOrdered.filter((item) => saved.includes(item.id));
+  const visibleDomains = domains.filter((domain) => preferences.enabledDomains.includes(domain));
+  const followedStateStoryCount = preferences.followedState
+    ? preferenceFilteredItems.filter((item) => item.state === preferences.followedState).length
+    : 0;
+  const stateFilterAvailable = activeDomain === "India" && Boolean(preferences.followedState) && followedStateStoryCount >= 3;
 
   const toggleTheme = () => {
     const next = theme === "light" ? "dark" : "light";
@@ -253,6 +282,51 @@ export function CyberChronicleApp({
       window.localStorage.setItem(INTEREST_PROFILE_KEY, JSON.stringify(next));
       return next;
     });
+  };
+
+  const updatePreferences = (next: AppPreferences) => {
+    setPreferences(next);
+    savePreferences(window.localStorage, next);
+    if (!next.followedState) setStateOnly(false);
+    if (activeDomain !== "Latest" && !next.enabledDomains.includes(activeDomain)) setActiveDomain("Latest");
+  };
+
+  const resetInterestProfile = () => {
+    window.localStorage.removeItem(INTEREST_PROFILE_KEY);
+    setInterestProfile(null);
+    setLocationMessage("Your learned reading interests were reset.");
+  };
+
+  const requestLocation = () => {
+    if (!("geolocation" in navigator)) {
+      setLocationMessage("Location is not supported by this browser. Choose your state manually instead.");
+      return;
+    }
+    setLocating(true);
+    setLocationMessage(null);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const state = resolveState(coords.latitude, coords.longitude);
+        setLocating(false);
+        if (!state) {
+          setLocationMessage("Your location could not be resolved to an Indian state. Choose one manually instead.");
+          return;
+        }
+        setPreferences((current) => {
+          const next = { ...current, followedState: state };
+          savePreferences(window.localStorage, next);
+          return next;
+        });
+        setLocationMessage(`${state} was saved. Your coordinates were not stored.`);
+      },
+      (error) => {
+        setLocating(false);
+        setLocationMessage(error.code === error.PERMISSION_DENIED
+          ? "Location permission was not granted. You can still choose your state manually."
+          : "Your state could not be detected. Choose it manually instead.");
+      },
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 30 * 60_000 },
+    );
   };
 
   const currentNavigationState = (overrides: Partial<AppNavigationState> = {}): AppNavigationState => ({
@@ -400,6 +474,7 @@ export function CyberChronicleApp({
     setMobileTab("home");
     setSettingsPage("hub");
     setSelected(null);
+    setStateOnly(false);
   };
 
   if (!editionHero || !headlineStory) {
@@ -437,11 +512,12 @@ export function CyberChronicleApp({
 
       <div className="settings-group">
         <strong>Notifications</strong>
-        <NotificationManager />
+        <NotificationManager preferences={preferences} />
       </div>
 
       <div className="settings-group">
         <strong>Intelligence & Data</strong>
+        <SettingsRow icon={<SlidersHorizontal size={18} />} title="News & Personalization" description={preferences.followedState ? `${preferences.followedState} · ${preferences.enabledDomains.length} domains` : `${preferences.enabledDomains.length} domains · location off`} onClick={() => handleSettingsPageChange("preferences")} />
         <SettingsRow icon={<ShieldCheck size={18} />} title="Intelligence Sources" description={`${data.sources.length} active sources reporting`} onClick={() => handleSettingsPageChange("sources")} />
         <SettingsRow icon={<Check size={18} />} title="Editorial Standards" description="How we verify and classify" onClick={() => handleSettingsPageChange("standards")} />
         <SettingsRow icon={<ShieldCheck size={18} />} title="Privacy & Data" description="How notifications use your data" onClick={() => handleSettingsPageChange("privacy")} />
@@ -472,6 +548,17 @@ export function CyberChronicleApp({
 
   const settingsView = (() => {
     switch (settingsPage) {
+      case "preferences": return <PreferencesView
+        onBack={() => window.history.back()}
+        preferences={preferences}
+        onChange={updatePreferences}
+        onRequestLocation={requestLocation}
+        locating={locating}
+        locationMessage={locationMessage}
+        followedStateStoryCount={followedStateStoryCount}
+        hasInterestProfile={Boolean(interestProfile)}
+        onResetInterest={resetInterestProfile}
+      />;
       case "about": return <AboutView onBack={() => window.history.back()} />;
       case "creator": return <CreatorView onBack={() => window.history.back()} />;
       case "operator": return <OperatorView onBack={() => window.history.back()} />;
@@ -575,9 +662,23 @@ export function CyberChronicleApp({
       )}
       {(query || activeDomain !== "Latest") && (
         <div className="results-banner">
-          <div><span>Viewing</span><h1>{query ? `Search: "${query}"` : activeDomain}</h1></div>
+          <div><span>Viewing</span><h1>{query ? `Search: "${query}"` : stateOnly && preferences.followedState ? preferences.followedState : activeDomain}</h1></div>
           <b>{filtered.length} stories</b>
         </div>
+      )}
+
+      {activeDomain === "India" && preferences.followedState && (
+        stateFilterAvailable ? (
+          <div className="state-filter-rail" role="toolbar" aria-label="India coverage">
+            <button className={!stateOnly ? "active" : ""} aria-pressed={!stateOnly} onClick={() => setStateOnly(false)}>All India</button>
+            <button className={stateOnly ? "active" : ""} aria-pressed={stateOnly} onClick={() => setStateOnly(true)}>{preferences.followedState} ({followedStateStoryCount})</button>
+          </div>
+        ) : (
+          <div className="regional-coverage-notice" role="status">
+            <strong>{preferences.followedState} coverage</strong>
+            <span>Regional news coming soon. We’ll show the state filter automatically when enough verified stories are available.</span>
+          </div>
+        )
       )}
 
       {hero ? (
@@ -610,9 +711,11 @@ export function CyberChronicleApp({
       ) : (
         <section className="search-empty-state" aria-live="polite">
           <Search size={28} />
-          <h2>No matching stories in this edition</h2>
-          <p>Try fewer words, check the spelling, or search all sections. Search matches each word across headlines, summaries, categories, publishers, and advisory details.</p>
-          <button onClick={() => { setQuery(""); handleDomainChange("Latest"); }}>Browse the latest edition</button>
+          <h2>No stories match this view</h2>
+          <p>{query
+            ? "Try fewer words, check the spelling, or search all sections. Search matches headlines, summaries, categories, publishers, and advisory details."
+            : "Your current domain or severity preferences hide every story in this edition. Adjust News & Personalization to widen the feed."}</p>
+          <button onClick={() => query ? setQuery("") : handleSettingsPageChange("preferences")}>{query ? "Clear search" : "Review preferences"}</button>
         </section>
       )}
 
@@ -703,7 +806,7 @@ export function CyberChronicleApp({
       <section className="trending-section">
         <div><span>Trending now</span><h2>What readers are following</h2></div>
         <div className="trend-list">
-          {domains.map((domain, index) => <button key={domain} onClick={() => handleDomainChange(domain)}><b>{String(index + 1).padStart(2, "0")}</b><span>{domain}</span><em>{domainCount(domain)} stories</em></button>)}
+          {visibleDomains.map((domain, index) => <button key={domain} onClick={() => handleDomainChange(domain)}><b>{String(index + 1).padStart(2, "0")}</b><span>{domain}</span><em>{domainCount(domain)} stories</em></button>)}
         </div>
       </section>
       </>}
@@ -756,7 +859,7 @@ export function CyberChronicleApp({
 
         <nav className={mobileMenu ? "section-nav nav-open" : "section-nav"} aria-label="News sections">
           <button className={activeDomain === "Latest" ? "active" : ""} onClick={() => handleDomainChange("Latest")}>Latest</button>
-          {domains.map((domain) => (
+          {visibleDomains.map((domain) => (
             <button key={domain} className={activeDomain === domain ? "active" : ""} onClick={() => handleDomainChange(domain)}>
               {domain}
             </button>

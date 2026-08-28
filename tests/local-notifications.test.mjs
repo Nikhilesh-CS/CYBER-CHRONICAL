@@ -28,6 +28,10 @@ test("service worker baselines existing stories and limits new alerts", () => {
   assert.match(worker, /slice\(0, 3\)/);
   assert.match(worker, /periodicsync/);
   assert.match(worker, /showNotification/);
+  assert.match(worker, /matchesPreferences/);
+  assert.match(worker, /enabledDomains\.includes\(itemDomain\(item\)\)/);
+  assert.match(worker, /meetsSeverityFloor\(item, normalized\.severityFloor\)/);
+  assert.match(worker, /right\.state === preferences\.followedState/);
 });
 
 test("expired notification links use an in-app notice instead of alert", () => {

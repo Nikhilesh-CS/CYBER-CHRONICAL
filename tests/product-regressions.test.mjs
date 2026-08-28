@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const { beginnerExplanation } = await import(new URL("../lib/explanations.ts", import.meta.url).href);
-const { computeDomain, matchesStoryQuery, storiesForDomain } = await import(new URL("../lib/editorial.ts", import.meta.url).href);
+const { computeDomain, computeState, matchesStoryQuery, storiesForDomain } = await import(new URL("../lib/editorial.ts", import.meta.url).href);
 const { navigationStateFromUrl, navigationUrl, isAppNavigationState } = await import(new URL("../lib/navigation.ts", import.meta.url).href);
 const { parseRssFeed } = await import(new URL("../lib/parsers/rss.ts", import.meta.url).href);
 const { getSourceDefinitions } = await import(new URL("../lib/sources.ts", import.meta.url).href);
@@ -79,6 +79,19 @@ test("navigation state survives URL round-trips for settings, sections, and stor
   assert.equal(isAppNavigationState(state), true);
 });
 
+test("personalization settings are addressable in browser history", () => {
+  const state = {
+    cyberChronicle: true,
+    tab: "settings",
+    settingsPage: "preferences",
+    domain: "Latest",
+    storyId: null,
+  };
+  const url = navigationUrl("https://example.com/CYBER-CHRONICAL/", state);
+  assert.equal(navigationStateFromUrl(url).settingsPage, "preferences");
+  assert.equal(isAppNavigationState(state), true);
+});
+
 test("search matches every query word across story meaning fields", () => {
   const item = {
     id: "story-1",
@@ -111,6 +124,56 @@ test("domain classification prioritizes subject over geography", () => {
   assert.equal(computeDomain(indianCyber), "Cybersecurity");
   assert.equal(computeDomain(isroLaunch), "Space");
   assert.deepEqual(storiesForDomain([indianCyber, isroLaunch], "Space"), [isroLaunch]);
+});
+
+test("state tagging resolves state names and major-city mentions without UI state", () => {
+  const base = {
+    id: "state-test",
+    sourceId: "test",
+    title: "CC-TEST: Regional update",
+    summary: "",
+    studentSummary: "",
+    primaryPublisher: "Test",
+    categories: ["india"],
+    region: "india",
+    metadata: { type: "general" },
+  };
+  assert.equal(computeState({ ...base, summary: "Authorities in Bengaluru published the update." }), "Karnataka");
+  assert.equal(computeState({ ...base, studentSummary: "The report concerns West Bengal." }), "West Bengal");
+  assert.equal(computeState({ ...base, title: "CC-TEST: National policy update" }), null);
+});
+
+test("snapshot generation persists and reports build-time state tags", async () => {
+  const script = await readFile(new URL("../scripts/update-news-snapshot.mjs", import.meta.url), "utf8");
+  assert.match(script, /const state = computeState\(item\)/);
+  assert.match(script, /JSON\.stringify\(taggedEdition/);
+  assert.match(script, /\[LOCATION\] Tagged/);
+  assert.match(script, /domain: computeDomain\(item\)/);
+});
+
+test("location personalization is opt-in and stores no raw coordinates", async () => {
+  const [app, view] = await Promise.all([
+    readFile(new URL("../app/cyber-chronicle-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/settings/views/PreferencesView.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /navigator\.geolocation\.getCurrentPosition/);
+  assert.match(app, /resolveState\(coords\.latitude, coords\.longitude\)/);
+  assert.doesNotMatch(app, /localStorage\.setItem\([^\n]*(?:latitude|longitude|coords)/);
+  assert.match(view, /Use my current location/);
+  assert.match(view, /Regional news coming soon/);
+});
+
+test("news and notification controls share one combined preference object", async () => {
+  const [preferences, manager] = await Promise.all([
+    readFile(new URL("../lib/preferences.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/app-shell/NotificationManager.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(preferences, /cyber-chronicle-preferences-v1/);
+  assert.match(preferences, /enabledDomains/);
+  assert.match(preferences, /severityFloor/);
+  assert.match(preferences, /followedState/);
+  assert.match(manager, /preferences: AppPreferences/);
+  assert.doesNotMatch(manager, /LOCAL_NOTIFICATION_PREFERENCES_KEY/);
 });
 
 test("trending sections use the same history-aware navigation path as the main navigation", async () => {

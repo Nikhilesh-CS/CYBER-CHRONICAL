@@ -153,6 +153,53 @@ export function storiesForDomain(items: RealIntelligenceItem[], domain: Domain |
   return domain === "Latest" ? items : items.filter((item) => computeDomain(item) === domain);
 }
 
+const INDIA_STATE_PATTERNS: readonly (readonly [string, RegExp])[] = [
+  ["Andaman and Nicobar Islands", /\b(andaman(?: and nicobar)?|port blair)\b/i],
+  ["Andhra Pradesh", /\b(andhra pradesh|visakhapatnam|vizag|vijayawada|tirupati)\b/i],
+  ["Arunachal Pradesh", /\b(arunachal pradesh|itanagar|tawang|pasighat)\b/i],
+  ["Assam", /\b(assam|guwahati|silchar|dibrugarh)\b/i],
+  ["Bihar", /\b(bihar|patna|gaya|muzaffarpur)\b/i],
+  ["Chandigarh", /\bchandigarh\b/i],
+  ["Chhattisgarh", /\b(chhattisgarh|raipur|bilaspur|bhilai)\b/i],
+  ["Dadra and Nagar Haveli and Daman and Diu", /\b(dadra and nagar haveli|daman and diu|silvassa|daman|diu)\b/i],
+  ["Delhi", /\b(delhi|new delhi)\b/i],
+  ["Goa", /\b(goa|panaji|margao|vasco da gama)\b/i],
+  ["Gujarat", /\b(gujarat|ahmedabad|surat|vadodara|gandhinagar)\b/i],
+  ["Haryana", /\b(haryana|gurugram|gurgaon|faridabad|panipat)\b/i],
+  ["Himachal Pradesh", /\b(himachal pradesh|shimla|dharamshala|solan)\b/i],
+  ["Jammu and Kashmir", /\b(jammu and kashmir|jammu|srinagar|anantnag)\b/i],
+  ["Jharkhand", /\b(jharkhand|ranchi|jamshedpur|dhanbad)\b/i],
+  ["Karnataka", /\b(karnataka|bengaluru|bangalore|mysuru|mysore|mangaluru|mangalore)\b/i],
+  ["Kerala", /\b(kerala|thiruvananthapuram|kochi|cochin|kozhikode)\b/i],
+  ["Ladakh", /\b(ladakh|leh|kargil)\b/i],
+  ["Lakshadweep", /\b(lakshadweep|kavaratti)\b/i],
+  ["Madhya Pradesh", /\b(madhya pradesh|bhopal|indore|gwalior)\b/i],
+  ["Maharashtra", /\b(maharashtra|mumbai|pune|nagpur)\b/i],
+  ["Manipur", /\b(manipur|imphal|churachandpur|thoubal)\b/i],
+  ["Meghalaya", /\b(meghalaya|shillong|tura|jowai)\b/i],
+  ["Mizoram", /\b(mizoram|aizawl|lunglei|champhai)\b/i],
+  ["Nagaland", /\b(nagaland|kohima|dimapur|mokokchung)\b/i],
+  ["Odisha", /\b(odisha|orissa|bhubaneswar|cuttack|rourkela)\b/i],
+  ["Puducherry", /\b(puducherry|pondicherry|karaikal|yanam)\b/i],
+  ["Punjab", /\b(punjab|ludhiana|amritsar|jalandhar)\b/i],
+  ["Rajasthan", /\b(rajasthan|jaipur|jodhpur|udaipur)\b/i],
+  ["Sikkim", /\b(sikkim|gangtok|namchi|geyzing|gyalshing)\b/i],
+  ["Tamil Nadu", /\b(tamil nadu|chennai|coimbatore|madurai)\b/i],
+  ["Telangana", /\b(telangana|hyderabad|warangal|nizamabad)\b/i],
+  ["Tripura", /\b(tripura|agartala|dharmanagar|kailashahar)\b/i],
+  ["Uttar Pradesh", /\b(uttar pradesh|lucknow|kanpur|varanasi|noida)\b/i],
+  ["Uttarakhand", /\b(uttarakhand|dehradun|haridwar|haldwani)\b/i],
+  ["West Bengal", /\b(west bengal|kolkata|calcutta|howrah|siliguri)\b/i],
+];
+
+export function computeState(item: RealIntelligenceItem): string | null {
+  const text = `${plainTitle(item)} ${item.summary ?? ""} ${item.studentSummary ?? ""}`;
+  for (const [state, pattern] of INDIA_STATE_PATTERNS) {
+    if (pattern.test(text)) return state;
+  }
+  return null;
+}
+
 export function computeIntelligenceType(item: RealIntelligenceItem): IntelligenceType {
   const text = plainTitle(item).toLowerCase();
   
