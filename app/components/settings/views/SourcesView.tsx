@@ -3,8 +3,12 @@ import { ExternalLink } from "lucide-react";
 import { SettingsHeader } from "../SettingsHeader";
 import { computeSourceGroup, type SourceGroup } from "../../../../lib/editorial";
 import type { SourceResult } from "../../../../lib/news";
+import { getSourceDefinitions } from "../../../../lib/sources";
 
 export function SourcesView({ onBack, sources }: { onBack: () => void; sources: SourceResult[] }) {
+  const knownSiteUrls = useMemo(() => new Map(
+    getSourceDefinitions(new Date().getUTCFullYear()).map((source) => [source.id, source.siteUrl]),
+  ), []);
   const groupedSources = useMemo(() => {
     const groups: Record<SourceGroup, SourceResult[]> = {
       "OFFICIAL / GOVERNMENT": [],
@@ -35,13 +39,14 @@ export function SourcesView({ onBack, sources }: { onBack: () => void; sources: 
             <div key={group} className="settings-source-group">
               <h3>{group}</h3>
               <div>
-                {groupSources.map((source) => (
-                  <div key={source.id} className="settings-source-item">
+                {groupSources.map((source) => {
+                  const websiteUrl = source.siteUrl || knownSiteUrls.get(source.id);
+                  return <div key={source.id} className="settings-source-item">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <strong>{source.name}</strong>
-                      <a href={source.url} target="_blank" rel="noopener noreferrer" aria-label={`Visit ${source.name}`} style={{ color: "var(--brand)" }}>
+                      {websiteUrl && <a href={websiteUrl} target="_blank" rel="noopener noreferrer" aria-label={`Visit ${source.name} website`} style={{ color: "var(--brand)" }}>
                         <ExternalLink size={14} />
-                      </a>
+                      </a>}
                     </div>
                     <span>{source.authority}</span>
                     <div className="settings-source-meta">
@@ -50,8 +55,8 @@ export function SourcesView({ onBack, sources }: { onBack: () => void; sources: 
                         <i /> {source.status === "current" ? "Current" : source.status === "stale" ? "Stale" : "Offline"}
                       </span>
                     </div>
-                  </div>
-                ))}
+                  </div>;
+                })}
               </div>
             </div>
           );

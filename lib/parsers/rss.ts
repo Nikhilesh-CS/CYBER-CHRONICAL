@@ -19,6 +19,23 @@ function rssStudentSummary(definition: SourceDefinition, title: string): string 
   return `${definition.publisher} reports “${title}”. This is a developing news report until a direct statement or another independent source confirms the main claim.`;
 }
 
+const MAX_FEED_SUMMARY_LENGTH = 360;
+
+function feedSummary(description: string, title: string): string | undefined {
+  const cleaned = decodeHtml(decodeHtml(description))
+    .replace(/\b(?:read|continue)\s+(?:the\s+)?(?:full\s+)?(?:story|article|post)\b.*$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!cleaned || cleaned.toLocaleLowerCase() === title.trim().toLocaleLowerCase()) return undefined;
+
+  if (cleaned.length <= MAX_FEED_SUMMARY_LENGTH) return cleaned;
+  const shortened = cleaned.slice(0, MAX_FEED_SUMMARY_LENGTH + 1);
+  const sentenceEnd = Math.max(shortened.lastIndexOf(". "), shortened.lastIndexOf("! "), shortened.lastIndexOf("? "));
+  const wordEnd = shortened.lastIndexOf(" ");
+  const end = sentenceEnd >= 160 ? sentenceEnd + 1 : wordEnd >= 160 ? wordEnd : MAX_FEED_SUMMARY_LENGTH;
+  return `${shortened.slice(0, end).trim()}…`;
+}
+
 function extractImageUrl(block: string, baseUrl: string): string | undefined {
   const patterns = [
     /<media:content[^>]+url=["']([^"']+)["']/i,
@@ -95,6 +112,7 @@ export function parseRssFeed(xml: string, definition: SourceDefinition): RealInt
     const identifier = `CC-${stableHash(key).toUpperCase()}`;
     const official = definition.trustTier === 1;
     const studentSummary = rssStudentSummary(definition, title);
+    const sourceSummary = feedSummary(description, title);
     
     const finalCategories = enhanceCategories(definition.categories, title, description);
     const imageUrl = extractImageUrl(block, parsedUrl.origin);
@@ -103,7 +121,7 @@ export function parseRssFeed(xml: string, definition: SourceDefinition): RealInt
       id: key,
       sourceId: definition.id,
       title: `${identifier}: ${title}`,
-      summary: "Source metadata only. Cyber Chronicle does not reproduce the publisher's article text.",
+      summary: sourceSummary ?? "The publisher did not include a usable summary in its feed. Open the source for complete context.",
       publishedAt,
       updatedAt: publishedAt,
       categories: finalCategories,

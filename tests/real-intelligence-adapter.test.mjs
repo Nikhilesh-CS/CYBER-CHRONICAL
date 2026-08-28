@@ -204,13 +204,13 @@ test("marks matching reports from independent publishers as corroborated", async
   assert.equal(payload.items[0].evidence.length, 2);
 });
 
-test("keeps a single news report developing and stores metadata instead of article text", async () => {
-  const copiedText = "private body text that must never be copied into the story";
+test("keeps a single report developing and stores only a bounded publisher feed summary", async () => {
+  const omittedTail = "ARTICLE-BODY-TAIL-MUST-NOT-BE-STORED";
   const service = createRealIntelligenceService(
     async () => rssResponse(
       "Company investigates a possible data breach",
       "https://ciso.economictimes.indiatimes.com/news/cybercrime/test-breach/124",
-      `data breach ${copiedText}`,
+      `A company is investigating whether customer records were exposed. ${"Additional article detail. ".repeat(30)} ${omittedTail}`,
     ),
     { sourceIds: ["et-ciso-news"], enrichImages: false },
   );
@@ -221,5 +221,7 @@ test("keeps a single news report developing and stores metadata instead of artic
   assert.equal(payload.items[0].verificationStatus, "single-source");
   assert.equal(payload.items[0].storyState, "developing");
   assert.equal(payload.items[0].independentSourceCount, 1);
-  assert.doesNotMatch(serializedItem, new RegExp(copiedText));
+  assert.match(payload.items[0].summary, /^A company is investigating whether customer records were exposed\./);
+  assert.ok(payload.items[0].summary.length <= 361);
+  assert.doesNotMatch(serializedItem, new RegExp(omittedTail));
 });

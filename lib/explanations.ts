@@ -4,6 +4,13 @@ import { plainTitle } from "./editorial.ts";
 export function beginnerExplanation(item: RealIntelligenceItem) {
   const title = plainTitle(item);
   const text = title.toLowerCase();
+  const summary = item.summary.trim();
+  const hasPublisherSummary = Boolean(summary)
+    && !/^source metadata only\b/i.test(summary)
+    && !/^the publisher did not include a usable summary\b/i.test(summary);
+  const sourceContext = hasPublisherSummary
+    ? ` ${item.primaryPublisher}'s feed summary says: ${summary}`
+    : " The available feed metadata does not contain enough detail for a reliable explanation, so open the original source for context.";
 
   if (/\bslopsquatting\b/.test(text)) {
     return "The report warns that AI tools can suggest software package names that do not exist. Attackers may create harmful packages with those names, hoping a developer installs one by mistake.";
@@ -42,5 +49,42 @@ export function beginnerExplanation(item: RealIntelligenceItem) {
     return "The report describes harmful software that may steal information, spy on activity, or let an attacker control a device. The exact risk depends on the affected product and how the malware is delivered.";
   }
 
-  return `In plain English, this is a report about ${title}. Cyber Chronicle has only source metadata for this item, so open the linked evidence before treating the headline as a confirmed technical explanation.`;
+  if (/\b(?:spacecraft|satellite|rocket|launch|mission|astronaut|moon|mars|orbit)\b/.test(text) || item.categories.includes("space")) {
+    return `This is a space update about a mission, launch, spacecraft, or new observation.${sourceContext}`;
+  }
+  if (/\b(?:study|researchers?|scientists?|discovery|experiment|evidence)\b/.test(text) || item.categories.includes("science")) {
+    return `This is a science update about research or new evidence. A single report may describe early findings rather than a settled conclusion.${sourceContext}`;
+  }
+  if (/\b(?:health|disease|virus|vaccine|hospital|medicine|patient)\b/.test(text) || item.categories.includes("health")) {
+    return `This is a health update. It may affect public guidance, medical research, or healthcare services; use the linked source for the exact scope.${sourceContext}`;
+  }
+  if (/\b(?:climate|weather|pollution|emission|environment|wildlife)\b/.test(text) || item.categories.includes("environment")) {
+    return `This is an environment update about conditions, policy, or scientific evidence that may affect people or ecosystems.${sourceContext}`;
+  }
+  if (/\b(?:election|government|minister|parliament|court|law|policy)\b/.test(text) || item.categories.includes("politics")) {
+    return `This is a public-affairs update about a government decision, political event, law, or institution.${sourceContext}`;
+  }
+  if (/\b(?:company|market|economy|economic|business|funding|acquisition|merger)\b/.test(text) || item.categories.includes("business") || item.categories.includes("markets")) {
+    return `This is a business or markets update. It may concern a company decision, the economy, investment, or industry conditions.${sourceContext}`;
+  }
+  if (item.categories.includes("education")) {
+    return `This is an education update about students, institutions, policy, or learning.${sourceContext}`;
+  }
+  if (item.categories.includes("sports")) {
+    return `This is a sports update about a competition, team, athlete, or sporting organisation.${sourceContext}`;
+  }
+  if (item.categories.includes("entertainment")) {
+    return `This is an entertainment update about media, culture, or the people and organisations involved.${sourceContext}`;
+  }
+  if (item.categories.includes("india")) {
+    return `This is an India-focused public update.${sourceContext}`;
+  }
+  if (item.categories.includes("world")) {
+    return `This is an international news update.${sourceContext}`;
+  }
+
+  if (hasPublisherSummary) {
+    return `Cyber Chronicle does not have enough verified context to simplify this story without guessing. ${item.primaryPublisher}'s feed summary says: ${summary}`;
+  }
+  return "Cyber Chronicle cannot produce a reliable plain-language explanation from the available feed metadata. Open the linked source for the publisher's full context.";
 }

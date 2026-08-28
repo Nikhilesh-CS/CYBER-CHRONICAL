@@ -64,6 +64,7 @@ export type SourceResult = {
   authority: string;
   categories: NewsCategory[];
   trustTier: 1 | 2 | 3 | 4;
+  siteUrl: string;
   url: string;
   retrievedFrom: string | null;
   retrievedAt: string | null;

@@ -4,7 +4,7 @@ import {
   ArrowRight, Check, ChevronRight, Download,
   ExternalLink, Menu, Moon, RefreshCw, Search, ShieldCheck, Sun, X, Wifi, WifiOff,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import type { RealIntelligenceItem, RealIntelligenceResponse } from "../lib/news";
 import {
@@ -15,6 +15,10 @@ import {
 import { learnFromStory, rankForReader, readInterestProfile, INTEREST_PROFILE_KEY } from "../lib/intelligence/client";
 import type { IntelligenceIndex, InterestProfile } from "../lib/intelligence/types";
 import { beginnerExplanation } from "../lib/explanations";
+import {
+  isAppNavigationState, navigationStateFromUrl, navigationUrl,
+  type AppNavigationState, type SettingsPage,
+} from "../lib/navigation";
 import { NewsCard } from "./components/cards/NewsCard";
 import { ArticleReader } from "./components/article/ArticleReader";
 import { SectionHeading } from "./components/shared/SectionHeading";
@@ -70,10 +74,11 @@ export function CyberChronicleApp({
   const [mobileTab, setMobileTab] = useState<MobileTab>("home");
   const [isOnline, setIsOnline] = useState(true);
   const [intelFilter, setIntelFilter] = useState<string>("All");
-  const [settingsPage, setSettingsPage] = useState<string>("hub");
+  const [settingsPage, setSettingsPage] = useState<SettingsPage>("hub");
   const [intelligenceIndex, setIntelligenceIndex] = useState<IntelligenceIndex | null>(null);
   const [interestProfile, setInterestProfile] = useState<InterestProfile | null>(null);
   const [rankingNow, setRankingNow] = useState(() => Date.now());
+  const historyInitialized = useRef(false);
 
   const refresh = useCallback(async (force = false) => {
     setIsRefreshing(true);
@@ -163,11 +168,8 @@ export function CyberChronicleApp({
   useEffect(() => {
     document.body.style.overflow = selected ? "hidden" : "";
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setSelected(null);
-        const url = new URL(window.location.href);
-        url.searchParams.delete("story");
-        window.history.replaceState({}, "", url.toString());
+      if (event.key === "Escape" && selected) {
+        window.history.back();
       }
     };
     window.addEventListener("keydown", closeOnEscape);
@@ -247,11 +249,29 @@ export function CyberChronicleApp({
     });
   };
 
-  const markAsRead = (item: RealIntelligenceItem) => {
-    recordInterest(item.id, 1);
+  const currentNavigationState = (overrides: Partial<AppNavigationState> = {}): AppNavigationState => ({
+    cyberChronicle: true,
+    tab: mobileTab,
+    settingsPage,
+    domain: activeDomain,
+    storyId: selected?.id ?? null,
+    ...overrides,
+  });
+
+  const commitNavigation = (state: AppNavigationState, mode: "push" | "replace" = "push") => {
+    const method = mode === "push" ? "pushState" : "replaceState";
+    window.history[method](state, "", navigationUrl(window.location.href, state));
+  };
+
+  const markAsRead = (item: RealIntelligenceItem, addToHistory = true, trackInterest = true) => {
+    if (trackInterest) recordInterest(item.id, 1);
     setSelected(item);
+    if (addToHistory) {
+      commitNavigation(currentNavigationState({ storyId: item.id }));
+    }
     if (computeIntelligenceType(item) === "Official Advisory" && !readAlerts.includes(item.id)) {
       setReadAlerts((current) => {
+        if (current.includes(item.id)) return current;
         const next = [...current, item.id];
         window.localStorage.setItem("cyber-chronicle-read-alerts", JSON.stringify(next));
         return next;
@@ -259,7 +279,7 @@ export function CyberChronicleApp({
     }
   };
 
-  const openStoryById = useCallback(async (storyId: string) => {
+  const openStoryById = useCallback(async (storyId: string, addToHistory = true, trackInterest = true) => {
     let item = data.items.find(x => x.id === storyId);
     if (!item) {
       try {
@@ -274,19 +294,45 @@ export function CyberChronicleApp({
       }
     }
     if (item) {
-      markAsRead(item);
+      markAsRead(item, addToHistory, trackInterest);
     } else {
+      setSelected(null);
       setAppNotice("This story is no longer available in the current edition.");
     }
   }, [data.items, dataUrl, readAlerts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const storyId = params.get("story");
-    const timeout = storyId ? window.setTimeout(() => void openStoryById(storyId), 0) : null;
-    return () => { if (timeout !== null) window.clearTimeout(timeout); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const applyNavigation = (state: AppNavigationState) => {
+      setMobileTab(state.tab);
+      setSettingsPage(state.tab === "settings" ? state.settingsPage : "hub");
+      setActiveDomain(state.tab === "home" ? state.domain : "Latest");
+      setMobileMenu(false);
+      if (state.storyId) void openStoryById(state.storyId, false, false);
+      else setSelected(null);
+    };
+
+    if (!historyInitialized.current) {
+      historyInitialized.current = true;
+      const requested = navigationStateFromUrl(window.location.href);
+      if (requested.storyId) {
+        const base = { ...requested, storyId: null };
+        window.history.replaceState(base, "", navigationUrl(window.location.href, base));
+        window.history.pushState(requested, "", navigationUrl(window.location.href, requested));
+      } else {
+        window.history.replaceState(requested, "", navigationUrl(window.location.href, requested));
+      }
+      applyNavigation(requested);
+    }
+
+    const handlePopState = (event: PopStateEvent) => {
+      const state = isAppNavigationState(event.state)
+        ? event.state
+        : navigationStateFromUrl(window.location.href);
+      applyNavigation(state);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [openStoryById]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -313,6 +359,10 @@ export function CyberChronicleApp({
     ordered.filter((item) => computeDomain(item) === domain).length;
 
   const handleTabChange = (tab: MobileTab) => {
+    const nextSettingsPage: SettingsPage = tab === "settings" ? settingsPage : "hub";
+    const nextDomain = tab === "home" ? "Latest" : activeDomain;
+    commitNavigation(currentNavigationState({ tab, settingsPage: nextSettingsPage, domain: nextDomain, storyId: null }));
+    setSelected(null);
     setMobileTab(tab);
     if (tab !== "settings") {
       setSettingsPage("hub");
@@ -328,6 +378,22 @@ export function CyberChronicleApp({
       setActiveDomain("Latest");
       setQuery("");
     }
+  };
+
+  const handleSettingsPageChange = (page: SettingsPage) => {
+    commitNavigation(currentNavigationState({ tab: "settings", settingsPage: page, storyId: null }));
+    setMobileTab("settings");
+    setSelected(null);
+    setSettingsPage(page);
+  };
+
+  const handleDomainChange = (domain: Domain | "Latest") => {
+    commitNavigation(currentNavigationState({ tab: "home", settingsPage: "hub", domain, storyId: null }));
+    setActiveDomain(domain);
+    setMobileMenu(false);
+    setMobileTab("home");
+    setSettingsPage("hub");
+    setSelected(null);
   };
 
   if (!hero) {
@@ -370,18 +436,18 @@ export function CyberChronicleApp({
 
       <div className="settings-group">
         <strong>Intelligence & Data</strong>
-        <SettingsRow icon={<ShieldCheck size={18} />} title="Intelligence Sources" description={`${data.sources.length} active sources reporting`} onClick={() => setSettingsPage("sources")} />
-        <SettingsRow icon={<Check size={18} />} title="Editorial Standards" description="How we verify and classify" onClick={() => setSettingsPage("standards")} />
-        <SettingsRow icon={<ShieldCheck size={18} />} title="Privacy & Data" description="How notifications use your data" onClick={() => setSettingsPage("privacy")} />
+        <SettingsRow icon={<ShieldCheck size={18} />} title="Intelligence Sources" description={`${data.sources.length} active sources reporting`} onClick={() => handleSettingsPageChange("sources")} />
+        <SettingsRow icon={<Check size={18} />} title="Editorial Standards" description="How we verify and classify" onClick={() => handleSettingsPageChange("standards")} />
+        <SettingsRow icon={<ShieldCheck size={18} />} title="Privacy & Data" description="How notifications use your data" onClick={() => handleSettingsPageChange("privacy")} />
       </div>
 
       <div className="settings-group">
         <strong>About</strong>
-        <SettingsRow icon={<ExternalLink size={18} />} title="About Cyber Chronicle" onClick={() => setSettingsPage("about")} />
-        <SettingsRow icon={<ExternalLink size={18} />} title="Creator" onClick={() => setSettingsPage("creator")} />
-        <SettingsRow icon={<ExternalLink size={18} />} title="Operator Information" onClick={() => setSettingsPage("operator")} />
-        <SettingsRow icon={<ExternalLink size={18} />} title="Disclaimer" onClick={() => setSettingsPage("disclaimer")} />
-        <SettingsRow icon={<ExternalLink size={18} />} title="Credits & Attribution" onClick={() => setSettingsPage("credits")} />
+        <SettingsRow icon={<ExternalLink size={18} />} title="About Cyber Chronicle" onClick={() => handleSettingsPageChange("about")} />
+        <SettingsRow icon={<ExternalLink size={18} />} title="Creator" onClick={() => handleSettingsPageChange("creator")} />
+        <SettingsRow icon={<ExternalLink size={18} />} title="Operator Information" onClick={() => handleSettingsPageChange("operator")} />
+        <SettingsRow icon={<ExternalLink size={18} />} title="Disclaimer" onClick={() => handleSettingsPageChange("disclaimer")} />
+        <SettingsRow icon={<ExternalLink size={18} />} title="Credits & Attribution" onClick={() => handleSettingsPageChange("credits")} />
       </div>
 
       <div className="settings-group">
@@ -400,14 +466,14 @@ export function CyberChronicleApp({
 
   const settingsView = (() => {
     switch (settingsPage) {
-      case "about": return <AboutView onBack={() => setSettingsPage("hub")} />;
-      case "creator": return <CreatorView onBack={() => setSettingsPage("hub")} />;
-      case "operator": return <OperatorView onBack={() => setSettingsPage("hub")} />;
-      case "standards": return <StandardsView onBack={() => setSettingsPage("hub")} />;
-      case "sources": return <SourcesView onBack={() => setSettingsPage("hub")} sources={data.sources} />;
-      case "privacy": return <PrivacyView onBack={() => setSettingsPage("hub")} />;
-      case "disclaimer": return <DisclaimerView onBack={() => setSettingsPage("hub")} />;
-      case "credits": return <CreditsView onBack={() => setSettingsPage("hub")} />;
+      case "about": return <AboutView onBack={() => window.history.back()} />;
+      case "creator": return <CreatorView onBack={() => window.history.back()} />;
+      case "operator": return <OperatorView onBack={() => window.history.back()} />;
+      case "standards": return <StandardsView onBack={() => window.history.back()} />;
+      case "sources": return <SourcesView onBack={() => window.history.back()} sources={data.sources} />;
+      case "privacy": return <PrivacyView onBack={() => window.history.back()} />;
+      case "disclaimer": return <DisclaimerView onBack={() => window.history.back()} />;
+      case "credits": return <CreditsView onBack={() => window.history.back()} />;
       default: return settingsHub;
     }
   })();
@@ -668,9 +734,9 @@ export function CyberChronicleApp({
         </div>
 
         <nav className={mobileMenu ? "section-nav nav-open" : "section-nav"} aria-label="News sections">
-          <button className={activeDomain === "Latest" ? "active" : ""} onClick={() => { setActiveDomain("Latest"); setMobileMenu(false); setMobileTab("home"); }}>Latest</button>
+          <button className={activeDomain === "Latest" ? "active" : ""} onClick={() => handleDomainChange("Latest")}>Latest</button>
           {domains.map((domain) => (
-            <button key={domain} className={activeDomain === domain ? "active" : ""} onClick={() => { setActiveDomain(domain); setMobileMenu(false); setMobileTab("home"); }}>
+            <button key={domain} className={activeDomain === domain ? "active" : ""} onClick={() => handleDomainChange(domain)}>
               {domain}
             </button>
           ))}
@@ -709,12 +775,7 @@ export function CyberChronicleApp({
       />
 
       {selected && (
-        <ArticleReader key={selected.id} item={selected} relatedItems={relatedItems} onOpenRelated={markAsRead} saved={saved.includes(selected.id)} onSave={() => toggleSaved(selected.id)} onClose={() => {
-          setSelected(null);
-          const url = new URL(window.location.href);
-          url.searchParams.delete("story");
-          window.history.replaceState({}, "", url.toString());
-        }} />
+        <ArticleReader key={selected.id} item={selected} relatedItems={relatedItems} onOpenRelated={markAsRead} saved={saved.includes(selected.id)} onSave={() => toggleSaved(selected.id)} onClose={() => window.history.back()} />
       )}
     </div>
     </MotionConfig>

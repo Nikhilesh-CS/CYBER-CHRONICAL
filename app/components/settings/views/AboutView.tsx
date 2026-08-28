@@ -18,22 +18,24 @@ export function AboutView({ onBack }: { onBack: () => void }) {
         
         <InfoBlock>
           <p><strong>MULTI-SOURCE INTELLIGENCE</strong></p>
-          <pre style={{ fontSize: "11px", fontFamily: "inherit", opacity: 0.8 }}>
-Official Advisories
-        +
-Threat Research
-        +
-Independent Reporting
-        ↓
-Cyber Chronicle
-        ↓
-Classification
-Corroboration
-Confidence
-Severity
-        ↓
-Readable Intelligence
-          </pre>
+          <div className="about-intelligence-flow" aria-label="How Cyber Chronicle turns sources into readable intelligence">
+            <div className="about-flow-sources">
+              <span>Official advisories</span>
+              <span>Threat research</span>
+              <span>Independent reporting</span>
+            </div>
+            <span className="about-flow-arrow" aria-hidden="true">↓</span>
+            <strong>Cyber Chronicle</strong>
+            <span className="about-flow-arrow" aria-hidden="true">↓</span>
+            <div className="about-flow-process">
+              <span>Classification</span>
+              <span>Corroboration</span>
+              <span>Confidence</span>
+              <span>Severity</span>
+            </div>
+            <span className="about-flow-arrow" aria-hidden="true">↓</span>
+            <strong className="about-flow-result">Readable intelligence</strong>
+          </div>
         </InfoBlock>
       </div>
     </div>
