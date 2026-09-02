@@ -114,7 +114,7 @@ export function NotificationManager({ preferences }: { preferences: AppPreferenc
           <Bell size={20} />
           <div>
             <strong>On-device Notifications</strong>
-            <small>{state === "granted" ? "Active with your News & Personalization preferences" : state === "denied" ? "Notifications are blocked in your browser settings" : "Get local alerts without an account or notification server"}</small>
+            <small>{state === "granted" ? "Active on this device · checks when the app refreshes" : state === "denied" ? "Notifications are blocked in your browser settings" : "Get local alerts without an account or notification server"}</small>
           </div>
         </div>
         {state === "granted" ? (
@@ -127,6 +127,7 @@ export function NotificationManager({ preferences }: { preferences: AppPreferenc
           <button onClick={() => void subscribe()} disabled={subscribing} className="notification-enable-btn"><Bell size={14} />{subscribing ? "Enabling…" : "Enable"}</button>
         ) : <small className="notification-blocked">Unblock in browser settings</small>}
       </div>
+      {state === "granted" && <small className="notification-blocked" style={{ color: "inherit", opacity: 0.75 }}>Background checks depend on browser support; keep the installed app enabled for best results.</small>}
     </div>
   );
 }

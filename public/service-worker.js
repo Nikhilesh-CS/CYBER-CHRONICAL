@@ -163,13 +163,13 @@ function classify(item) {
   const text = plainTitle(item).toLowerCase();
   const severity = item.metadata?.type === "cyber" ? item.metadata.severity : "Unknown";
   const isOfficial = item.verificationStatus === "official" || /\b(advisory|patch|security update)\b/.test(text);
-  if (severity === "Critical" && item.metadata?.type === "cyber" && (isOfficial || item.confidence === "High")) return { type: "CRITICAL_ALERT", preference: "criticalAlerts", title: "🚨 CRITICAL SECURITY ALERT" };
-  if (severity === "High" && item.metadata?.type === "cyber") return { type: "HIGH_ALERT", preference: "highSeverityAlerts", title: "⚠️ HIGH SEVERITY ALERT" };
-  if (isOfficial) return { type: "SECURITY_UPDATE", preference: "officialAdvisories", title: "🛡️ SECURITY ADVISORY" };
-  if (/\b(breach|leak|personal data|stolen data|exposed data)\b/.test(text)) return { type: "INTELLIGENCE_UPDATE", preference: "dataBreaches", title: "🔍 DATA BREACH" };
-  if (/\b(vulnerabilit|exploit|zero-day|cve-|ransomware|attack|incident|hacked|compromise|threat|campaign|apt|botnet|malware|trojan|spyware|actor)\b/.test(text)) return { type: "INTELLIGENCE_UPDATE", preference: "threatIntelligence", title: "🔍 THREAT INTELLIGENCE" };
-  if (/\b(ai|artificial intelligence|machine learning|llm)\b/.test(`${text} ${item.category || ""}`.toLowerCase())) return { type: "NEWS_UPDATE", preference: "aiTechUpdates", title: "🤖 AI & TECHNOLOGY" };
-  return { type: "NEWS_UPDATE", preference: "generalNews", title: "📰 CYBER CHRONICLE" };
+  if (severity === "Critical" && item.metadata?.type === "cyber" && (isOfficial || item.confidence === "High")) return { type: "CRITICAL_ALERT", preference: "criticalAlerts", title: "🚨 Critical security alert" };
+  if (severity === "High" && item.metadata?.type === "cyber") return { type: "HIGH_ALERT", preference: "highSeverityAlerts", title: "⚠️ High-priority security news" };
+  if (isOfficial) return { type: "SECURITY_UPDATE", preference: "officialAdvisories", title: "🛡️ Security update" };
+  if (/\b(breach|leak|personal data|stolen data|exposed data)\b/.test(text)) return { type: "INTELLIGENCE_UPDATE", preference: "dataBreaches", title: "🔍 Security news" };
+  if (/\b(vulnerabilit|exploit|zero-day|cve-|ransomware|attack|incident|hacked|compromise|threat|campaign|apt|botnet|malware|trojan|spyware|actor)\b/.test(text)) return { type: "INTELLIGENCE_UPDATE", preference: "threatIntelligence", title: "🔍 Security news" };
+  if (/\b(ai|artificial intelligence|machine learning|llm)\b/.test(`${text} ${item.category || ""}`.toLowerCase())) return { type: "NEWS_UPDATE", preference: "aiTechUpdates", title: "🤖 AI & technology news" };
+  return { type: "NEWS_UPDATE", preference: "generalNews", title: "📰 Cyber Chronicle" };
 }
 
 function itemDomain(item) {
@@ -226,7 +226,9 @@ async function processNotificationItems(items) {
     const severity = item.metadata?.type === "cyber" ? item.metadata.severity || "Unknown" : "Unknown";
     const imageUrl = /^https:\/\//i.test(item.imageUrl || "") ? item.imageUrl : new URL("og.png", self.registration.scope).href;
     await self.registration.showNotification(classification.title, {
-      body: `${plainTitle(item)}\n\nSeverity: ${severity} • Source: ${item.primaryPublisher}`,
+      body: `${plainTitle(item)}\n\n${item.primaryPublisher}${severity !== "Unknown" ? ` · ${severity}` : ""}`
+        + (item.metadata?.type === "cyber" && item.metadata.affected ? `\n\nAffects: ${item.metadata.affected}` : "")
+        + (item.metadata?.type === "cyber" && item.metadata.action ? `\n\nNext step: ${item.metadata.action}` : ""),
       image: imageUrl,
       icon: new URL("app-icon-192.png", self.registration.scope).href,
       badge: new URL("app-icon-192.png", self.registration.scope).href,

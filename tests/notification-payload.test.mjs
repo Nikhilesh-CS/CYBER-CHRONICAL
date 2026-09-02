@@ -22,9 +22,10 @@ function story(overrides = {}) {
 test("notification payload includes severity, source, and branded fallback image", () => {
   const payload = buildNotificationPayload(story());
 
-  assert.match(payload.body, /Severity: High • Source: Example Security/);
-  assert.match(payload.body, /Affected: Example Product 1\.0/);
-  assert.match(payload.body, /Action: Install the vendor update/);
+  assert.equal(payload.title, "⚠️ High-priority security news");
+  assert.match(payload.body, /Example Security · High/);
+  assert.match(payload.body, /Affects: Example Product 1\.0/);
+  assert.match(payload.body, /Next step: Install the vendor update/);
   assert.equal(payload.imageUrl, "https://nikhilesh-cs.github.io/CYBER-CHRONICAL/og.png");
   assert.ok(Object.values(payload).every((value) => typeof value === "string"));
 });

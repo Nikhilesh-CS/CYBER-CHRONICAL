@@ -20,6 +20,9 @@ test("notification UI only becomes active after local setup is persisted", () =>
   assert.match(manager, /Notification\.permission === "granted" && enabled/);
   assert.match(manager, /CONFIGURE_LOCAL_NOTIFICATIONS/);
   assert.match(manager, /registration\.showNotification\("✅ CYBER CHRONICLE TEST"/);
+  assert.doesNotMatch(worker, /SECURITY ADVISORY|THREAT INTELLIGENCE|HIGH SEVERITY ALERT/);
+  assert.match(worker, /Critical security alert/);
+  assert.match(worker, /High-priority security news/);
 });
 
 test("service worker baselines existing stories and limits new alerts", () => {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { breakingScore, isBreakingStory } from "../lib/editorial.ts";
+import { breakingScore, intelligencePriority, isBreakingStory } from "../lib/editorial.ts";
 import { buildIntelligenceIndex, cosineSimilarity, lexicalVector, relatedStoryIds } from "../lib/intelligence/semantic-engine.mjs";
 import { learnFromStory, rankForReader } from "../lib/intelligence/client.ts";
 
@@ -33,6 +33,13 @@ test("breaking score decays and expires after two hours", () => {
 test("ordinary recent news is not mislabeled breaking", () => {
   const story = item("general", "Company publishes annual report", { metadata: { type: "general" } });
   assert.equal(isBreakingStory(story, Date.parse("2026-08-28T10:10:00.000Z")), false);
+});
+
+test("event promotions do not take the lead over reported news", () => {
+  const event = item("event", "[Virtual Event] What Every Enterprise Should Know", { metadata: { type: "general" }, confidence: "Medium" });
+  const report = item("report", "Security researchers disclose an active vulnerability", { metadata: { type: "cyber", severity: "High" } });
+  assert.ok(intelligencePriority(report) > intelligencePriority(event));
+  assert.equal(isBreakingStory(event, Date.parse("2026-08-28T10:10:00.000Z")), false);
 });
 
 test("semantic index reuses vectors and connects nearest stories", async () => {

@@ -258,11 +258,22 @@ export function intelligencePriority(item: RealIntelligenceItem): number {
 
   const domain = computeDomain(item);
   if (domain === "Cybersecurity") score += 10;
+
+  // Publisher event promotions are useful, but should not outrank reported news
+  // simply because their registration date is recent. Keep them discoverable
+  // while giving actual incidents, advisories and reporting the lead position.
+  if (isPromotionalStory(item)) score -= 25;
   
   return score;
 }
 
+export function isPromotionalStory(item: RealIntelligenceItem) {
+  const text = `${plainTitle(item)} ${item.summary || ""}`.toLowerCase();
+  return /\b(virtual event|webinar|conference|summit|register|registration|doors open|join us|save the date|call for papers|agenda)\b/.test(text);
+}
+
 export function breakingScore(item: RealIntelligenceItem, now = Date.now(), corroborationVelocity = 0): number {
+  if (isPromotionalStory(item)) return 0;
   const publishedAt = Date.parse(item.publishedAt);
   if (!Number.isFinite(publishedAt)) return 0;
   const ageMinutes = Math.max(0, (now - publishedAt) / 60_000);
