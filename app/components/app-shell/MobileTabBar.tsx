@@ -1,9 +1,9 @@
 "use client";
 
-import { Home, Bell, Activity, Bookmark, Settings } from "lucide-react";
+import { Home, Bell, Activity, Bookmark, Settings, GraduationCap } from "lucide-react";
 import { motion } from "motion/react";
 
-export type MobileTab = "home" | "alerts" | "intelligence" | "saved" | "settings";
+export type MobileTab = "home" | "alerts" | "intelligence" | "saved" | "learn" | "settings";
 
 export function MobileTabBar({
   active,
@@ -21,6 +21,7 @@ export function MobileTabBar({
     { id: "alerts", label: "Alerts", icon: Bell, badge: alertCount },
     { id: "intelligence", label: "Intelligence", icon: Activity },
     { id: "saved", label: "Saved", icon: Bookmark, badge: savedCount },
+    { id: "learn", label: "Learn", icon: GraduationCap },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 

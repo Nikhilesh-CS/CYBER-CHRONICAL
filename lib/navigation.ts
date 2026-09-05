@@ -2,7 +2,7 @@ import { domains, type Domain } from "./editorial.ts";
 
 export const SETTINGS_PAGES = ["hub", "preferences", "about", "creator", "operator", "standards", "sources", "privacy", "disclaimer", "credits"] as const;
 export type SettingsPage = typeof SETTINGS_PAGES[number];
-export type AppTab = "home" | "alerts" | "intelligence" | "saved" | "settings";
+export type AppTab = "home" | "alerts" | "intelligence" | "saved" | "learn" | "settings";
 
 export type AppNavigationState = {
   cyberChronicle: true;
@@ -20,7 +20,7 @@ export const DEFAULT_NAVIGATION_STATE: AppNavigationState = {
   storyId: null,
 };
 
-const tabs: AppTab[] = ["home", "alerts", "intelligence", "saved", "settings"];
+const tabs: AppTab[] = ["home", "alerts", "intelligence", "saved", "learn", "settings"];
 
 export function isAppNavigationState(value: unknown): value is AppNavigationState {
   if (!value || typeof value !== "object") return false;

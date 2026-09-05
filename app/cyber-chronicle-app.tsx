@@ -39,6 +39,8 @@ import { SourcesView } from "./components/settings/views/SourcesView";
 import { PrivacyView } from "./components/settings/views/PrivacyView";
 import { DisclaimerView } from "./components/settings/views/DisclaimerView";
 import { CreditsView } from "./components/settings/views/CreditsView";
+import { AcademyView } from "./components/academy/AcademyView";
+import { DEFAULT_ACADEMY_PROGRESS, loadCourseProgress, type AcademyProgress } from "../lib/courses/progress";
 import { PreferencesView } from "./components/settings/views/PreferencesView";
 import { SettingsRow } from "./components/settings/SettingsRow";
 
@@ -88,6 +90,7 @@ export function CyberChronicleApp({
   const [locating, setLocating] = useState(false);
   const [locationMessage, setLocationMessage] = useState<string | null>(null);
   const [stateOnly, setStateOnly] = useState(false);
+  const [academyProgress, setAcademyProgress] = useState<AcademyProgress>(DEFAULT_ACADEMY_PROGRESS);
   const [rankingNow, setRankingNow] = useState(() => Date.now());
   const historyInitialized = useRef(false);
 
@@ -117,6 +120,7 @@ export function CyberChronicleApp({
     const restore = window.setTimeout(() => {
       setIsOnline(navigator.onLine);
       setPreferences(loadPreferences(window.localStorage));
+      setAcademyProgress(loadCourseProgress(window.localStorage));
       if (storedTheme === "dark") {
         setTheme("dark");
         document.documentElement.dataset.theme = "dark";
@@ -458,6 +462,10 @@ export function CyberChronicleApp({
     if (tab === "home") {
       setActiveDomain("Latest");
       setQuery("");
+    }
+    if (tab === "learn") {
+      setQuery("");
+      setActiveDomain("Latest");
     }
   };
 
@@ -834,6 +842,7 @@ export function CyberChronicleApp({
       case "intelligence": return intelligenceView;
       case "saved": return savedView;
       case "settings": return settingsView;
+      case "learn": return <AcademyView progress={academyProgress} onProgressChange={setAcademyProgress} />;
       default: return homeFeed;
     }
   })();
