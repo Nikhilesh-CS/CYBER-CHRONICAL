@@ -42,6 +42,8 @@ import { CreditsView } from "./components/settings/views/CreditsView";
 import { AcademyView } from "./components/academy/AcademyView";
 import { DEFAULT_ACADEMY_PROGRESS, loadCourseProgress, type AcademyProgress } from "../lib/courses/progress";
 import { PreferencesView } from "./components/settings/views/PreferencesView";
+import { GlossaryView } from "./components/settings/views/GlossaryView";
+import { DailyBriefing } from "./components/briefing/DailyBriefing";
 import { SettingsRow } from "./components/settings/SettingsRow";
 
 type InstallPrompt = Event & {
@@ -550,6 +552,7 @@ export function CyberChronicleApp({
         <strong>Intelligence & Data</strong>
         <SettingsRow icon={<SlidersHorizontal size={18} />} title="News & Personalization" description={preferences.followedState ? `${preferences.followedState} · ${preferences.enabledDomains.length} domains` : `${preferences.enabledDomains.length} domains · location off`} onClick={() => handleSettingsPageChange("preferences")} />
         <SettingsRow icon={<ShieldCheck size={18} />} title="Intelligence Sources" description={`${data.sources.length} active sources reporting`} onClick={() => handleSettingsPageChange("sources")} />
+        <SettingsRow icon={<ShieldCheck size={18} />} title="Cyber Glossary" description="Plain-language security definitions" onClick={() => handleSettingsPageChange("glossary")} />
         <SettingsRow icon={<Check size={18} />} title="Editorial Standards" description="How we verify and classify" onClick={() => handleSettingsPageChange("standards")} />
         <SettingsRow icon={<ShieldCheck size={18} />} title="Privacy & Data" description="How notifications use your data" onClick={() => handleSettingsPageChange("privacy")} />
       </div>
@@ -590,6 +593,7 @@ export function CyberChronicleApp({
         hasInterestProfile={Boolean(interestProfile)}
         onResetInterest={resetInterestProfile}
       />;
+      case "glossary": return <GlossaryView onBack={() => window.history.back()} />;
       case "about": return <AboutView onBack={() => window.history.back()} />;
       case "creator": return <CreatorView onBack={() => window.history.back()} />;
       case "operator": return <OperatorView onBack={() => window.history.back()} />;
@@ -685,6 +689,7 @@ export function CyberChronicleApp({
   /* ---- Home Feed ---- */
   const homeFeed = (
     <main className="news-home">
+      <DailyBriefing items={intelligenceOrdered} onOpen={(item) => markAsRead(item)} />
       {interestProfile && interestProfile.engagementCount >= 2 && (
         <motion.div className="interest-strip" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
           <span>FOR YOU</span>

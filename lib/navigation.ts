@@ -1,6 +1,6 @@
 import { domains, type Domain } from "./editorial.ts";
 
-export const SETTINGS_PAGES = ["hub", "preferences", "about", "creator", "operator", "standards", "sources", "privacy", "disclaimer", "credits"] as const;
+export const SETTINGS_PAGES = ["hub", "preferences", "glossary", "about", "creator", "operator", "standards", "sources", "privacy", "disclaimer", "credits"] as const;
 export type SettingsPage = typeof SETTINGS_PAGES[number];
 export type AppTab = "home" | "alerts" | "intelligence" | "saved" | "learn" | "settings";
 

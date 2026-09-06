@@ -90,6 +90,7 @@ export function PreferencesView({
         </section>
 
         <section className="preference-section"><div className="preference-heading"><div><strong>Reading size</strong><small>Adjust article text for comfortable reading</small></div></div><div className="segmented-preference" role="radiogroup" aria-label="Reading size">{["small", "medium", "large"].map((size) => <button key={size} role="radio" aria-checked={fontSize === size} className={fontSize === size ? "active" : ""} onClick={() => setFontSize(size)}>{size[0].toUpperCase() + size.slice(1)}</button>)}</div></section>
+        <section className="preference-section"><label className="learning-toggle"><input type="checkbox" checked={preferences.learningMode} onChange={(event) => onChange({ ...preferences, learningMode: event.target.checked })} /><span><strong>Learning Mode</strong><small>Show plain-language definitions more prominently while reading</small></span></label></section>
 
         <section className="preference-section">
           <div className="preference-heading"><div><strong>Visible domains</strong><small>Choose what appears in navigation and your main feed</small></div></div>

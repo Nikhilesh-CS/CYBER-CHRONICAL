@@ -1,0 +1,3 @@
+import type { RealIntelligenceItem } from "./news";
+import { intelligencePriority, plainTitle, computeDomain } from "./editorial";
+export function dailyBriefing(items: RealIntelligenceItem[], limit = 5) { const seen = new Set<string>(); return [...items].sort((a,b) => intelligencePriority(b)-intelligencePriority(a)).filter((item) => { const key = plainTitle(item).toLowerCase().replace(/\W/g, "").slice(0, 45); if (seen.has(key)) return false; seen.add(key); return true; }).slice(0, limit).map((item) => ({ id: item.id, title: plainTitle(item), domain: computeDomain(item), severity: item.metadata?.type === "cyber" ? item.metadata.severity : undefined })); }

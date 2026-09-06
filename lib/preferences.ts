@@ -21,6 +21,7 @@ export type AppPreferences = {
   severityFloor: SeverityFloor;
   followedState: string | null;
   notifications: NotificationTypePreferences;
+  learningMode: boolean;
 };
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationTypePreferences = {
@@ -38,6 +39,7 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   severityFloor: "all",
   followedState: null,
   notifications: DEFAULT_NOTIFICATION_PREFERENCES,
+  learningMode: false,
 };
 
 export function normalizePreferences(value: unknown, legacyNotifications?: unknown): AppPreferences {
@@ -55,6 +57,7 @@ export function normalizePreferences(value: unknown, legacyNotifications?: unkno
     severityFloor,
     followedState: typeof input.followedState === "string" && INDIA_STATE_NAMES.includes(input.followedState.trim()) ? input.followedState.trim() : null,
     notifications: { ...DEFAULT_NOTIFICATION_PREFERENCES, ...notificationInput },
+    learningMode: input.learningMode === true,
   };
 }
 

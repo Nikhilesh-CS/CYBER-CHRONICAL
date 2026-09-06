@@ -1,0 +1,5 @@
+"use client";
+import { ArrowRight, Radio } from "lucide-react";
+import type { RealIntelligenceItem } from "../../../lib/news";
+import { dailyBriefing } from "../../../lib/briefing";
+export function DailyBriefing({ items, onOpen }: { items: RealIntelligenceItem[]; onOpen: (item: RealIntelligenceItem) => void }) { const entries = dailyBriefing(items); return <section className="daily-briefing" aria-labelledby="daily-briefing-title"><div className="daily-briefing-heading"><span><Radio size={15} />DAILY CYBER BRIEFING</span><small>Top verified signals in this edition</small><h2 id="daily-briefing-title">The short version</h2></div><ol>{entries.map((entry, index) => { const item = items.find((candidate) => candidate.id === entry.id); return <li key={entry.id}><b>{String(index + 1).padStart(2, "0")}</b><button onClick={() => item && onOpen(item)}><span>{entry.title}</span><small>{entry.domain}{entry.severity ? ` · ${entry.severity}` : ""}</small></button><ArrowRight size={14} /></li>; })}</ol></section> }
