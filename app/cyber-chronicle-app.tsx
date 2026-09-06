@@ -43,7 +43,6 @@ import { AcademyView } from "./components/academy/AcademyView";
 import { DEFAULT_ACADEMY_PROGRESS, loadCourseProgress, type AcademyProgress } from "../lib/courses/progress";
 import { PreferencesView } from "./components/settings/views/PreferencesView";
 import { GlossaryView } from "./components/settings/views/GlossaryView";
-import { DailyBriefing } from "./components/briefing/DailyBriefing";
 import { SettingsRow } from "./components/settings/SettingsRow";
 
 type InstallPrompt = Event & {
@@ -690,7 +689,6 @@ export function CyberChronicleApp({
   /* ---- Home Feed ---- */
   const homeFeed = (
     <main className="news-home">
-      <DailyBriefing items={intelligenceOrdered} onOpen={(item) => markAsRead(item)} />
       {interestProfile && interestProfile.engagementCount >= 2 && (
         <motion.div className="interest-strip" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
           <span>FOR YOU</span>
