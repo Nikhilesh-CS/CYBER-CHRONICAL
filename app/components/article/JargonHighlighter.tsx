@@ -1,0 +1,4 @@
+"use client";
+import { useState } from "react";
+import { JARGON_DICTIONARY } from "../../../lib/jargon";
+export function JargonHighlighter({ text }: { text: string }) { const [open, setOpen] = useState<string | null>(null); const terms = JARGON_DICTIONARY.filter((entry) => entry.matches.test(text)); if (!terms.length) return <>{text}</>; const pattern = new RegExp(`(${terms.map((entry) => entry.matches.source).join("|")})`, "ig"); return <>{text.split(pattern).map((part, index) => { const entry = terms.find((candidate) => candidate.matches.test(part)); if (!entry) return <span key={`${part}-${index}`}>{part}</span>; return <span className="jargon-inline" key={`${part}-${index}`}><button onClick={() => setOpen(open === entry.term ? null : entry.term)} aria-label={`Explain ${entry.term}`}>{part}</button>{open === entry.term && <span className="jargon-tooltip" role="tooltip"><strong>{entry.term}</strong><span>{entry.simple}</span></span>}</span>; })}</> }

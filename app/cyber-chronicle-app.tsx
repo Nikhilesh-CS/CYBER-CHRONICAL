@@ -92,6 +92,7 @@ export function CyberChronicleApp({
   const [stateOnly, setStateOnly] = useState(false);
   const [academyProgress, setAcademyProgress] = useState<AcademyProgress>(DEFAULT_ACADEMY_PROGRESS);
   const [rankingNow, setRankingNow] = useState(() => Date.now());
+  const [showBackTop, setShowBackTop] = useState(false);
   const historyInitialized = useRef(false);
 
   const refresh = useCallback(async (force = false) => {
@@ -121,6 +122,8 @@ export function CyberChronicleApp({
       setIsOnline(navigator.onLine);
       setPreferences(loadPreferences(window.localStorage));
       setAcademyProgress(loadCourseProgress(window.localStorage));
+      const fontSize = window.localStorage.getItem("cyber-chronicle-font-size");
+      if (fontSize === "small" || fontSize === "medium" || fontSize === "large") document.documentElement.dataset.fontSize = fontSize;
       if (storedTheme === "dark") {
         setTheme("dark");
         document.documentElement.dataset.theme = "dark";
@@ -152,6 +155,8 @@ export function CyberChronicleApp({
       window.removeEventListener("beforeinstallprompt", onInstall);
     };
   }, [refresh, serviceWorkerUrl]);
+
+  useEffect(() => { const onScroll = () => setShowBackTop(window.scrollY > 700); window.addEventListener("scroll", onScroll, { passive: true }); return () => window.removeEventListener("scroll", onScroll); }, []);
 
   useEffect(() => {
     const checkForLocalNotifications = async () => {
@@ -903,6 +908,7 @@ export function CyberChronicleApp({
         <motion.div
           key={activeBreakingStory?.id || headlineStory.id}
           className={`breaking-strip ${activeBreakingStory ? "breaking-active" : "breaking-latest"}`}
+          aria-live="polite"
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28 }}
@@ -932,6 +938,7 @@ export function CyberChronicleApp({
         alertCount={alerts.filter(item => !readAlerts.includes(item.id)).length}
         savedCount={saved.length}
       />
+      {showBackTop && <button className="back-to-top" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Back to top">↑</button>}
 
       {selected && (
         <ArticleReader key={selected.id} item={selected} relatedItems={relatedItems} onOpenRelated={markAsRead} saved={saved.includes(selected.id)} onSave={() => toggleSaved(selected.id)} onClose={() => window.history.back()} />

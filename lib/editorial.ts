@@ -58,6 +58,9 @@ export const domains: Domain[] = [
   "Sports",
   "Entertainment",
 ];
+export const DOMAIN_COLORS: Record<Domain, string> = {
+  Cybersecurity: "#c62828", "AI & Technology": "#7c3aed", Business: "#0f766e", Markets: "#15803d", World: "#2563eb", India: "#d97706", Science: "#0891b2", Space: "#4f46e5", Environment: "#16a34a", Sports: "#ea580c", Entertainment: "#db2777",
+};
 
 export type IntelligenceType =
   | "Official Advisory"

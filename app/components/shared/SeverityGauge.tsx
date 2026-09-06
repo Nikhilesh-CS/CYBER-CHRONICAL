@@ -1,0 +1,2 @@
+"use client";
+export function SeverityGauge({ severity }: { severity?: string }) { if (!severity || severity === "Unknown") return null; const value = severity === "Critical" ? 100 : severity === "High" ? 75 : severity === "Medium" ? 50 : 25; return <span className={`severity-gauge severity-${severity.toLowerCase()}`} title={`${severity} severity`} aria-label={`${severity} severity`}><i style={{ width: `${value}%` }} />{severity}</span>; }

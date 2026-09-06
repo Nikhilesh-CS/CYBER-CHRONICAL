@@ -1,7 +1,7 @@
 "use client";
 
 import { LocateFixed, MapPin, RotateCcw } from "lucide-react";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { domains, type Domain } from "../../../../lib/editorial";
 import { INDIA_STATE_NAMES } from "../../../../lib/geo/india-states";
 import {
@@ -42,6 +42,8 @@ export function PreferencesView({
   hasInterestProfile: boolean;
   onResetInterest: () => void;
 }) {
+  const [fontSize, setFontSize] = useState(() => typeof window === "undefined" ? "medium" : window.localStorage.getItem("cyber-chronicle-font-size") || "medium");
+  useEffect(() => { document.documentElement.dataset.fontSize = fontSize; window.localStorage.setItem("cyber-chronicle-font-size", fontSize); }, [fontSize]);
   const toggleDomain = (domain: Domain) => {
     const enabled = preferences.enabledDomains.includes(domain);
     if (enabled && preferences.enabledDomains.length === 1) return;
@@ -86,6 +88,8 @@ export function PreferencesView({
             </div>
           )}
         </section>
+
+        <section className="preference-section"><div className="preference-heading"><div><strong>Reading size</strong><small>Adjust article text for comfortable reading</small></div></div><div className="segmented-preference" role="radiogroup" aria-label="Reading size">{["small", "medium", "large"].map((size) => <button key={size} role="radio" aria-checked={fontSize === size} className={fontSize === size ? "active" : ""} onClick={() => setFontSize(size)}>{size[0].toUpperCase() + size.slice(1)}</button>)}</div></section>
 
         <section className="preference-section">
           <div className="preference-heading"><div><strong>Visible domains</strong><small>Choose what appears in navigation and your main feed</small></div></div>

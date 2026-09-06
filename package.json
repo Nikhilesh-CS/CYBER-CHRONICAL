@@ -10,7 +10,7 @@
     "build": "next build",
     "start": "npx serve out",
     "test": "npm run build && node --test tests/*.test.mjs",
-    "news:update": "node scripts/update-news-snapshot.mjs",
+    "news:update": "node scripts/update-news-snapshot.mjs && node scripts/generate-feed.mjs",
     "lint": "eslint . --ignore-pattern out --ignore-pattern dist --ignore-pattern .next --ignore-pattern .venv"
   },
   "dependencies": {

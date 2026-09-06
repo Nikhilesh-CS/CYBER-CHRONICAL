@@ -5,7 +5,7 @@ import {
   ExternalLink, X,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RealIntelligenceItem } from "../../../lib/news";
 import {
   formatDate, plainTitle, practicalActions,
@@ -18,6 +18,7 @@ import { StoryMeta } from "../shared/StoryMeta";
 import { ShareButton } from "../shared/ShareButton";
 import { SourceComparison } from "./SourceComparison";
 import { AffectedProducts } from "./AffectedProducts";
+import { JargonHighlighter } from "./JargonHighlighter";
 
 export function ArticleReader({ item, relatedItems, saved, onSave, onClose, onOpenRelated }: {
   item: RealIntelligenceItem;
@@ -28,6 +29,8 @@ export function ArticleReader({ item, relatedItems, saved, onSave, onClose, onOp
   onOpenRelated: (item: RealIntelligenceItem) => void;
 }) {
   const [showComparison, setShowComparison] = useState(false);
+  const readerRef = useRef<HTMLElement>(null);
+  useEffect(() => { readerRef.current?.focus(); }, []);
   const guidance = readerGuidance(item);
   const jargon = jargonFor(item);
   const title = plainTitle(item);
@@ -35,9 +38,10 @@ export function ArticleReader({ item, relatedItems, saved, onSave, onClose, onOp
 
   return (
     <motion.div className="article-overlay" role="presentation" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <motion.article className="article-reader" role="dialog" aria-modal="true" aria-labelledby="article-title" initial={{ x: 48 }} animate={{ x: 0 }} transition={{ type: "spring", stiffness: 340, damping: 34 }}>
+      <motion.article ref={readerRef} tabIndex={-1} className="article-reader" role="dialog" aria-modal="true" aria-labelledby="article-title" initial={{ x: 48 }} animate={{ x: 0 }} transition={{ type: "spring", stiffness: 340, damping: 34 }}>
         <div className="article-toolbar">
           <button onClick={onClose}><X size={20} />Close</button>
+          <button onClick={() => window.print()}>Print edition</button>
           <span>CYBER CHRONICLE</span>
           <div className="toolbar-actions">
             <ShareButton title={title} text={explanation} variant="icon" />
@@ -71,7 +75,7 @@ export function ArticleReader({ item, relatedItems, saved, onSave, onClose, onOp
           <section className="article-block simple-words">
             <span>IN SIMPLE WORDS</span>
             <h2>Here&apos;s what this means</h2>
-            <p>{explanation}</p>
+            <p><JargonHighlighter text={explanation} /></p>
             {jargon.length > 0 && (
               <div className="jargon-section">
                 <div className="jargon-heading">
@@ -173,7 +177,7 @@ export function ArticleReader({ item, relatedItems, saved, onSave, onClose, onOp
             <ShareButton title={title} text={explanation} variant="button" />
           </div>
 
-          <div className="article-end"><span>CC</span><p>Cyber Chronicle — Trusted Cybersecurity News. Simplified.</p></div>
+          <div className="article-end"><span>CC</span><p>Cyber Chronicle — Trusted Cybersecurity News. Simplified.</p><a href={`https://github.com/Nikhilesh-CS/CYBER-CHRONICAL/issues/new?title=Outdated%20story%3A%20${encodeURIComponent(title)}`} target="_blank" rel="noopener noreferrer">Report outdated story ↗</a></div>
         </div>
       </motion.article>
     </motion.div>
