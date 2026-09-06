@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import type { RealIntelligenceItem, RealIntelligenceResponse } from "../lib/news";
 import {
-  formatDate, plainTitle, relativeTime, verificationLabel,
+  formatDate, plainTitle, relativeTime, verificationLabel, isFutureDatedStory,
   breakingScore, computeDomain, computeIntelligenceType, isBreakingStory,
   matchesStoryQuery, storiesForDomain, domains, type Domain
 } from "../lib/editorial";
@@ -203,6 +203,7 @@ export function CyberChronicleApp({
   }, [selected]);
 
   const preferenceFilteredItems = useMemo(() => data.items.filter((item) => {
+    if (isFutureDatedStory(item)) return false;
     const domain = computeDomain(item);
     const severity = item.metadata?.type === "cyber" ? item.metadata.severity : undefined;
     return preferences.enabledDomains.includes(domain) && meetsSeverityFloor(severity, preferences.severityFloor);

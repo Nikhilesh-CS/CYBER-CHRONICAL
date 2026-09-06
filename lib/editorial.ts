@@ -280,6 +280,14 @@ export function isPromotionalStory(item: RealIntelligenceItem) {
   return /\b(virtual event|webinar|conference|summit|register|registration|doors open|join us|save the date|call for papers|agenda)\b/.test(text);
 }
 
+export function isFutureDatedStory(item: RealIntelligenceItem, now = Date.now()) {
+  const text = `${plainTitle(item)} ${item.summary || ""}`;
+  const match = text.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?:st|nd|rd|th)?[,]?\s+(20\d{2})\b/i);
+  if (!match) return false;
+  const eventDate = Date.parse(`${match[1]} ${match[2]}, ${match[3]} 23:59:59`);
+  return Number.isFinite(eventDate) && eventDate > now;
+}
+
 export function breakingScore(item: RealIntelligenceItem, now = Date.now(), corroborationVelocity = 0): number {
   if (isPromotionalStory(item)) return 0;
   const publishedAt = Date.parse(item.publishedAt);

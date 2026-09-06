@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { breakingScore, intelligencePriority, isBreakingStory } from "../lib/editorial.ts";
+import { breakingScore, intelligencePriority, isBreakingStory, isFutureDatedStory } from "../lib/editorial.ts";
 import { buildIntelligenceIndex, cosineSimilarity, lexicalVector, relatedStoryIds } from "../lib/intelligence/semantic-engine.mjs";
 import { learnFromStory, rankForReader } from "../lib/intelligence/client.ts";
 
@@ -40,6 +40,12 @@ test("event promotions do not take the lead over reported news", () => {
   const report = item("report", "Security researchers disclose an active vulnerability", { metadata: { type: "cyber", severity: "High" } });
   assert.ok(intelligencePriority(report) > intelligencePriority(event));
   assert.equal(isBreakingStory(event, Date.parse("2026-08-28T10:10:00.000Z")), false);
+});
+
+test("future-dated event stories are withheld until their announced date", () => {
+  const event = item("future", "[Virtual Event] Cloud Security — November 12, 2026", { metadata: { type: "general" } });
+  assert.equal(isFutureDatedStory(event, Date.parse("2026-09-06T10:00:00.000Z")), true);
+  assert.equal(isFutureDatedStory(event, Date.parse("2026-11-13T10:00:00.000Z")), false);
 });
 
 test("semantic index reuses vectors and connects nearest stories", async () => {
