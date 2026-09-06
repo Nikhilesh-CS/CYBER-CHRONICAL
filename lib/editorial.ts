@@ -122,6 +122,11 @@ export function computeDomain(item: RealIntelligenceItem): Domain {
   return "World";
 }
 
+export function readingTimeMinutes(item: RealIntelligenceItem) {
+  const words = `${item.summary || ""} ${item.studentSummary || ""} ${(item.knownFacts || []).join(" ")}`.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(words / 200));
+}
+
 function normalizedSearchText(value: string): string {
   return value
     .normalize("NFKD")

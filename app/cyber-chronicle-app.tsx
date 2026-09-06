@@ -469,6 +469,23 @@ export function CyberChronicleApp({
     }
   };
 
+  useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.isContentEditable || (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))) return;
+      if (event.key === "/") { event.preventDefault(); document.querySelector<HTMLInputElement>(".header-search input")?.focus(); return; }
+      if (event.key === "?") { setAppNotice("Shortcuts: j/k next or previous story · o open · s save · b close · / search"); return; }
+      if (event.key === "b" && selected) { event.preventDefault(); window.history.back(); return; }
+      if (!filtered.length) return;
+      const currentIndex = Math.max(0, filtered.findIndex((item) => item.id === selected?.id));
+      if (event.key === "j" || event.key === "k") { event.preventDefault(); const offset = event.key === "j" ? 1 : -1; markAsRead(filtered[(currentIndex + offset + filtered.length) % filtered.length]); }
+      if (event.key === "o" && !selected) markAsRead(filtered[0]);
+      if (event.key === "s" && selected) { event.preventDefault(); toggleSaved(selected.id); }
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [filtered, selected]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSettingsPageChange = (page: SettingsPage) => {
     commitNavigation(currentNavigationState({ tab: "settings", settingsPage: page, storyId: null }));
     setMobileTab("settings");

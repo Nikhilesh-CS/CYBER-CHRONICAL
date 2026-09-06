@@ -5,6 +5,7 @@ import {
   ExternalLink, X,
 } from "lucide-react";
 import { motion } from "motion/react";
+import { useState } from "react";
 import type { RealIntelligenceItem } from "../../../lib/news";
 import {
   formatDate, plainTitle, practicalActions,
@@ -15,6 +16,8 @@ import { beginnerExplanation } from "../../../lib/explanations";
 import { jargonFor } from "../../../lib/jargon";
 import { StoryMeta } from "../shared/StoryMeta";
 import { ShareButton } from "../shared/ShareButton";
+import { SourceComparison } from "./SourceComparison";
+import { AffectedProducts } from "./AffectedProducts";
 
 export function ArticleReader({ item, relatedItems, saved, onSave, onClose, onOpenRelated }: {
   item: RealIntelligenceItem;
@@ -24,6 +27,7 @@ export function ArticleReader({ item, relatedItems, saved, onSave, onClose, onOp
   onClose: () => void;
   onOpenRelated: (item: RealIntelligenceItem) => void;
 }) {
+  const [showComparison, setShowComparison] = useState(false);
   const guidance = readerGuidance(item);
   const jargon = jargonFor(item);
   const title = plainTitle(item);
@@ -133,7 +137,11 @@ export function ArticleReader({ item, relatedItems, saved, onSave, onClose, onOp
             <div>
               {item.evidence.map((evidence) => <a href={evidence.url} target="_blank" rel="noreferrer" key={evidence.url}><span><strong>{evidence.publisher}</strong><small>{evidence.category.replaceAll("-", " ")} · Published {formatDate(evidence.publishedAt)}</small></span><ExternalLink size={17} /></a>)}
             </div>
+            {item.evidence.length > 1 && <button className="primary-button" onClick={() => setShowComparison((value) => !value)}>{showComparison ? "Hide comparison" : "Compare sources"}</button>}
+            {showComparison && <SourceComparison item={item} onClose={() => setShowComparison(false)} />}
           </section>
+
+          {item.metadata.type === "cyber" && <AffectedProducts affected={item.metadata.affected} action={item.metadata.action} />}
 
           {relatedItems.length > 0 && (
             <section className="article-block related-coverage">
