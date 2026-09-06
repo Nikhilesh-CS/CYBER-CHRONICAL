@@ -84,7 +84,7 @@ export function beginnerExplanation(item: RealIntelligenceItem) {
   }
 
   if (hasPublisherSummary) {
-    return `Cyber Chronicle does not have enough verified context to simplify this story without guessing. ${item.primaryPublisher}'s feed summary says: ${summary}`;
+    return `${item.primaryPublisher}'s feed summary: ${summary}`;
   }
-  return "Cyber Chronicle cannot produce a reliable plain-language explanation from the available feed metadata. Open the linked source for the publisher's full context.";
+  return `The publisher did not include enough detail in its feed summary. Open the linked source for the full context.`;
 }

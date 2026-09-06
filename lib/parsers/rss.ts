@@ -24,6 +24,7 @@ const MAX_FEED_SUMMARY_LENGTH = 360;
 function feedSummary(description: string, title: string): string | undefined {
   const cleaned = decodeHtml(decodeHtml(description))
     .replace(/\b(?:read|continue)\s+(?:the\s+)?(?:full\s+)?(?:story|article|post)\b.*$/i, "")
+    .replace(/\s*The post\s+.+?\s+appeared first on\s+.+?\.?\s*$/i, "")
     .replace(/\s+/g, " ")
     .trim();
   if (!cleaned || cleaned.toLocaleLowerCase() === title.trim().toLocaleLowerCase()) return undefined;
@@ -114,7 +115,7 @@ export function parseRssFeed(xml: string, definition: SourceDefinition): RealInt
     const studentSummary = rssStudentSummary(definition, title);
     const sourceSummary = definition.feedSummaryPolicy === "metadata-only"
       ? undefined
-      : feedSummary(description, title);
+      : feedSummary(description, title) || undefined;
     
     const finalCategories = enhanceCategories(definition.categories, title, description);
     const imageUrl = extractImageUrl(block, parsedUrl.origin);

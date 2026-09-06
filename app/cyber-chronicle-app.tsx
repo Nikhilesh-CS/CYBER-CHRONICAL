@@ -95,6 +95,7 @@ export function CyberChronicleApp({
   const [rankingNow, setRankingNow] = useState(() => Date.now());
   const [showBackTop, setShowBackTop] = useState(false);
   const historyInitialized = useRef(false);
+  const feedScrollY = useRef(0);
 
   const refresh = useCallback(async (force = false) => {
     setIsRefreshing(true);
@@ -189,6 +190,7 @@ export function CyberChronicleApp({
 
   useEffect(() => {
     document.body.style.overflow = selected ? "hidden" : "";
+    if (!selected) window.scrollTo({ top: feedScrollY.current, behavior: "instant" });
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape" && selected) {
         window.history.back();
@@ -278,6 +280,7 @@ export function CyberChronicleApp({
   };
 
   const toggleSaved = (id: string) => {
+    navigator.vibrate?.(12);
     setSaved((current) => {
       const next = current.includes(id) ? current.filter((entry) => entry !== id) : [...current, id];
       if (!current.includes(id)) recordInterest(id, 3);
@@ -356,6 +359,8 @@ export function CyberChronicleApp({
   };
 
   const markAsRead = (item: RealIntelligenceItem, addToHistory = true, trackInterest = true) => {
+    feedScrollY.current = window.scrollY;
+    navigator.vibrate?.(12);
     if (trackInterest) recordInterest(item.id, 1);
     setSelected(item);
     if (addToHistory) {
@@ -451,6 +456,11 @@ export function CyberChronicleApp({
     ordered.filter((item) => computeDomain(item) === domain).length;
 
   const handleTabChange = (tab: MobileTab) => {
+    if (tab === mobileTab) {
+      if (window.scrollY > 20) window.scrollTo({ top: 0, behavior: "smooth" });
+      else void refresh(true);
+      return;
+    }
     const nextSettingsPage: SettingsPage = tab === "settings" ? settingsPage : "hub";
     const nextDomain = tab === "home" ? "Latest" : activeDomain;
     commitNavigation(currentNavigationState({ tab, settingsPage: nextSettingsPage, domain: nextDomain, storyId: null }));
@@ -945,7 +955,7 @@ export function CyberChronicleApp({
       {showBackTop && <button className="back-to-top" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Back to top">↑</button>}
 
       {selected && (
-        <ArticleReader key={selected.id} item={selected} relatedItems={relatedItems} onOpenRelated={markAsRead} saved={saved.includes(selected.id)} onSave={() => toggleSaved(selected.id)} onClose={() => window.history.back()} />
+        <ArticleReader key={selected.id} item={selected} relatedItems={relatedItems} navigationItems={filtered} onOpenRelated={markAsRead} saved={saved.includes(selected.id)} onSave={() => toggleSaved(selected.id)} onClose={() => window.history.back()} />
       )}
     </div>
     </MotionConfig>

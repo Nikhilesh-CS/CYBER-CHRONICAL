@@ -2,7 +2,7 @@
 
 import {
   ArrowRight, Bookmark, BookmarkCheck, Check, Clock3,
-  ExternalLink, X,
+  ExternalLink, Printer, Type, X, ZoomIn,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
@@ -20,47 +20,68 @@ import { SourceComparison } from "./SourceComparison";
 import { AffectedProducts } from "./AffectedProducts";
 import { JargonHighlighter } from "./JargonHighlighter";
 
-export function ArticleReader({ item, relatedItems, saved, onSave, onClose, onOpenRelated }: {
+export function ArticleReader({ item, relatedItems, navigationItems, saved, onSave, onClose, onOpenRelated }: {
   item: RealIntelligenceItem;
   relatedItems: RealIntelligenceItem[];
+  navigationItems: RealIntelligenceItem[];
   saved: boolean;
   onSave: () => void;
   onClose: () => void;
   onOpenRelated: (item: RealIntelligenceItem) => void;
 }) {
   const [showComparison, setShowComparison] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [showMiniHeader, setShowMiniHeader] = useState(false);
+  const [imageOpen, setImageOpen] = useState(false);
+  const swipeStart = useRef<number | null>(null);
   const readerRef = useRef<HTMLElement>(null);
   useEffect(() => { readerRef.current?.focus(); }, []);
   const guidance = readerGuidance(item);
   const jargon = jargonFor(item);
   const title = plainTitle(item);
   const explanation = beginnerExplanation(item);
+  const cycleReadingSize = () => {
+    const current = document.documentElement.dataset.fontSize || "medium";
+    const next = current === "small" ? "medium" : current === "medium" ? "large" : "small";
+    document.documentElement.dataset.fontSize = next;
+    window.localStorage.setItem("cyber-chronicle-font-size", next);
+  };
+  const haptic = () => navigator.vibrate?.(12);
+  const currentIndex = navigationItems.findIndex((candidate) => candidate.id === item.id);
+  const navigateBy = (offset: number) => {
+    const next = navigationItems[currentIndex + offset];
+    if (next) onOpenRelated(next);
+  };
 
   return (
     <motion.div className="article-overlay" role="presentation" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-      <motion.article ref={readerRef} tabIndex={-1} className="article-reader" role="dialog" aria-modal="true" aria-labelledby="article-title" initial={{ x: 48 }} animate={{ x: 0 }} transition={{ type: "spring", stiffness: 340, damping: 34 }}>
+      <motion.article ref={readerRef} tabIndex={-1} className="article-reader" role="dialog" aria-modal="true" aria-labelledby="article-title" initial={{ x: 48 }} animate={{ x: 0 }} transition={{ type: "spring", stiffness: 340, damping: 34 }} onScroll={(event) => { const target = event.currentTarget; setProgress(target.scrollTop / Math.max(1, target.scrollHeight - target.clientHeight)); setShowMiniHeader(target.scrollTop > 360); }} onTouchStart={(event) => { swipeStart.current = event.touches[0]?.clientX ?? null; }} onTouchEnd={(event) => { if (swipeStart.current === null) return; const distance = event.changedTouches[0].clientX - swipeStart.current; if (Math.abs(distance) > 85) navigateBy(distance < 0 ? 1 : -1); swipeStart.current = null; }}>
         <div className="article-toolbar">
           <button onClick={onClose}><X size={20} />Close</button>
-          <button onClick={() => window.print()}>Print edition</button>
-          <span>CYBER CHRONICLE</span>
-          <div className="toolbar-actions">
-            <ShareButton title={title} text={explanation} variant="icon" />
-            <button onClick={onSave}>{saved ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}{saved ? "Saved" : "Save"}</button>
-          </div>
+          <span className={showMiniHeader ? "article-mini-title" : ""}>{showMiniHeader ? title : "CYBER CHRONICLE"}</span>
+          {showMiniHeader && <button onClick={() => { haptic(); onSave(); }} aria-label={saved ? "Remove saved story" : "Save story"}>{saved ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}</button>}
         </div>
+        <i className="reading-progress" style={{ transform: `scaleX(${progress})` }} aria-hidden="true" />
+        <aside className="reader-action-rail" aria-label="Reader actions">
+          <button onClick={() => { haptic(); onSave(); }} aria-label={saved ? "Remove saved story" : "Save story"}>{saved ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}<span>{saved ? "Saved" : "Save"}</span></button>
+          <ShareButton title={title} text={explanation} variant="icon" />
+          <button onClick={cycleReadingSize} aria-label="Change reading size"><Type size={18} /><span>Text</span></button>
+          <button onClick={() => window.print()} aria-label="Print edition"><Printer size={18} /><span>Print</span></button>
+        </aside>
         <div className="article-body">
           <header className="article-header">
             {item.imageUrl && (
               <motion.img
                 src={item.imageUrl}
                 alt={title}
-                className="article-hero-image news-image"
+                className="article-hero-image news-image article-image-openable"
                 loading="eager"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = "none";
                 }}
+                onClick={() => setImageOpen(true)}
               />
             )}
             <span className="article-section">{computeIntelligenceType(item)}</span>
@@ -179,6 +200,7 @@ export function ArticleReader({ item, relatedItems, saved, onSave, onClose, onOp
 
           <div className="article-end"><span>CC</span><p>Cyber Chronicle — Trusted Cybersecurity News. Simplified.</p><a href={`https://github.com/Nikhilesh-CS/CYBER-CHRONICAL/issues/new?title=Outdated%20story%3A%20${encodeURIComponent(title)}`} target="_blank" rel="noopener noreferrer">Report outdated story ↗</a></div>
         </div>
+        {imageOpen && item.imageUrl && <div className="image-lightbox" role="dialog" aria-modal="true" aria-label="Full-screen story image" onClick={() => setImageOpen(false)}><motion.img src={item.imageUrl} alt={title} /><button onClick={() => setImageOpen(false)} aria-label="Close image"><X size={22} /></button><span><ZoomIn size={15} />Tap anywhere to close</span></div>}
       </motion.article>
     </motion.div>
   );

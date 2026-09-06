@@ -19,7 +19,7 @@ export function PullToRefresh({
   const scrollContainer = useRef<HTMLDivElement>(null);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (scrollContainer.current && scrollContainer.current.scrollTop <= 0) {
+    if (window.scrollY <= 0) {
       startY.current = e.touches[0].clientY;
       setPulling(true);
     }

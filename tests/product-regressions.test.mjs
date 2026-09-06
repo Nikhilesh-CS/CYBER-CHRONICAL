@@ -61,7 +61,7 @@ test("explanation fallback is honest and does not repeat the headline as an expl
     <pubDate>Thu, 27 Aug 2026 08:00:00 GMT</pubDate>
   </item></channel></rss>`, { ...source, categories: [] });
   const explanation = beginnerExplanation(item);
-  assert.match(explanation, /cannot produce a reliable plain-language explanation/i);
+  assert.match(explanation, /publisher did not include enough detail/i);
   assert.doesNotMatch(explanation, /this is a report about/i);
 });
 
