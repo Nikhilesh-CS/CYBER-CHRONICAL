@@ -17,7 +17,7 @@
     "lint": "eslint . --ignore-pattern out --ignore-pattern dist --ignore-pattern .next --ignore-pattern .venv"
   },
   "dependencies": {
-    "@huggingface/transformers": "^3.8.1",
+    "@huggingface/transformers": "^4.3.2",
     "lucide-react": "^1.25.0",
     "motion": "^12.23.24",
     "next": "^16.2.11",
