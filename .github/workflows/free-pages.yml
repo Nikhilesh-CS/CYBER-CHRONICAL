@@ -34,6 +34,8 @@ jobs:
           cache: npm
 
       - name: Install locked dependencies
+        env:
+          ONNXRUNTIME_NODE_INSTALL_CUDA: skip
         run: npm ci
 
       - name: Restore the local semantic model cache
