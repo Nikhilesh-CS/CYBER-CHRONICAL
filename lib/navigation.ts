@@ -9,6 +9,7 @@ export type AppNavigationState = {
   tab: AppTab;
   settingsPage: SettingsPage;
   domain: Domain | "Latest";
+  edition?: "general";
   storyId: string | null;
 };
 
@@ -29,6 +30,7 @@ export function isAppNavigationState(value: unknown): value is AppNavigationStat
     && tabs.includes(candidate.tab as AppTab)
     && SETTINGS_PAGES.includes(candidate.settingsPage as SettingsPage)
     && (candidate.domain === "Latest" || domains.includes(candidate.domain as Domain))
+    && (candidate.edition === undefined || candidate.edition === "general")
     && (candidate.storyId === null || typeof candidate.storyId === "string");
 }
 
@@ -46,6 +48,7 @@ export function navigationStateFromUrl(currentUrl: string | URL): AppNavigationS
     tab,
     settingsPage,
     domain,
+    ...(url.searchParams.get("edition") === "general" ? { edition: "general" as const } : {}),
     storyId: url.searchParams.get("story"),
   };
 }
@@ -59,6 +62,7 @@ export function navigationUrl(currentUrl: string | URL, state: AppNavigationStat
   setOrDelete("view", state.tab, "home");
   setOrDelete("settings", state.tab === "settings" ? state.settingsPage : null, "hub");
   setOrDelete("section", state.tab === "home" ? state.domain : null, "Latest");
+  setOrDelete("edition", state.edition ?? null);
   setOrDelete("story", state.storyId);
   return url.toString();
 }

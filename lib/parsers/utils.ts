@@ -1,6 +1,22 @@
 export const FETCH_TIMEOUT_MS = 12_000;
 export const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 
+export async function fetchReviewed(url: string, allowedHosts: string[], fetcher: typeof fetch, init: RequestInit) {
+  let current = new URL(url);
+  for (let redirects = 0; redirects <= 3; redirects += 1) {
+    if (current.protocol !== "https:" || current.username || current.password || !allowedHosts.includes(current.hostname)) {
+      throw new Error("Upstream redirected to an unreviewed origin");
+    }
+    const response = await fetcher(current.toString(), { ...init, redirect: "manual" });
+    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+    const destination = response.headers.get("location");
+    if (!destination) throw new Error("Upstream redirect has no destination");
+    await response.body?.cancel();
+    current = new URL(destination, current);
+  }
+  throw new Error("Upstream redirect limit exceeded");
+}
+
 export function decodeHtml(value: string): string {
   const named: Record<string, string> = {
     amp: "&",
@@ -16,7 +32,7 @@ export function decodeHtml(value: string): string {
       const numeric = entity.toLowerCase().startsWith("x")
         ? Number.parseInt(entity.slice(1), 16)
         : Number.parseInt(entity, 10);
-      return Number.isFinite(numeric) ? String.fromCodePoint(numeric) : " ";
+      return Number.isInteger(numeric) && numeric >= 0 && numeric <= 0x10FFFF ? String.fromCodePoint(numeric) : " ";
     })
     .replace(/&([a-z]+);/gi, (_match, entity: string) => named[entity.toLowerCase()] ?? " ")
     .replace(/\s+/g, " ")

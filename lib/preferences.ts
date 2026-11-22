@@ -1,5 +1,6 @@
 import { domains, type Domain } from "./editorial.ts";
 import { INDIA_STATE_NAMES } from "./geo/india-states.ts";
+import { normalizeWatchlist, type StackProduct } from "./watchlist.ts";
 
 export const PREFERENCES_KEY = "cyber-chronicle-preferences-v1";
 export const LEGACY_NOTIFICATION_PREFERENCES_KEY = "cyber-chronicle-notification-preferences";
@@ -14,6 +15,7 @@ export type NotificationTypePreferences = {
   threatIntelligence: boolean;
   aiTechUpdates: boolean;
   generalNews: boolean;
+  watchlist?: boolean;
 };
 
 export type AppPreferences = {
@@ -22,6 +24,8 @@ export type AppPreferences = {
   followedState: string | null;
   notifications: NotificationTypePreferences;
   learningMode: boolean;
+  watchlist: StackProduct[];
+  density: "comfortable" | "compact";
 };
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationTypePreferences = {
@@ -32,6 +36,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationTypePreferences = {
   threatIntelligence: true,
   aiTechUpdates: false,
   generalNews: false,
+  watchlist: true,
 };
 
 export const DEFAULT_PREFERENCES: AppPreferences = {
@@ -40,6 +45,8 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
   followedState: null,
   notifications: DEFAULT_NOTIFICATION_PREFERENCES,
   learningMode: false,
+  watchlist: [],
+  density: "comfortable",
 };
 
 export function normalizePreferences(value: unknown, legacyNotifications?: unknown): AppPreferences {
@@ -58,6 +65,8 @@ export function normalizePreferences(value: unknown, legacyNotifications?: unkno
     followedState: typeof input.followedState === "string" && INDIA_STATE_NAMES.includes(input.followedState.trim()) ? input.followedState.trim() : null,
     notifications: { ...DEFAULT_NOTIFICATION_PREFERENCES, ...notificationInput },
     learningMode: input.learningMode === true,
+    watchlist: normalizeWatchlist(input.watchlist),
+    density: input.density === "compact" ? "compact" : "comfortable",
   };
 }
 

@@ -140,12 +140,23 @@ function normalizedSearchText(value: string): string {
 }
 
 export function matchesStoryQuery(item: RealIntelligenceItem, query: string): boolean {
+  return matchesSearchText(storySearchText(item), query);
+}
+
+export function matchesSearchText(searchable: string, query: string) {
   const tokens = normalizedSearchText(query).split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) return true;
+  return tokens.every((token) => searchable.includes(token));
+}
+
+export function buildStorySearchIndex(generatedAt: string, items: RealIntelligenceItem[]) {
+  return { generatedAt, stories: Object.fromEntries(items.map((item) => [item.id, storySearchText(item)])) };
+}
+
+export function storySearchText(item: RealIntelligenceItem): string {
   const metadata = item.metadata?.type === "cyber"
-    ? `${item.metadata.identifier ?? ""} ${item.metadata.affected ?? ""} ${item.metadata.action ?? ""}`
+    ? `${item.metadata.identifier ?? ""} ${(item.metadata.cveIds ?? []).join(" ")} ${item.metadata.affected ?? ""} ${item.metadata.action ?? ""}`
     : "";
-  const searchable = normalizedSearchText([
+  return normalizedSearchText([
     plainTitle(item),
     item.summary,
     item.studentSummary,
@@ -154,7 +165,6 @@ export function matchesStoryQuery(item: RealIntelligenceItem, query: string): bo
     item.region,
     metadata,
   ].filter(Boolean).join(" "));
-  return tokens.every((token) => searchable.includes(token));
 }
 
 export function storiesForDomain(items: RealIntelligenceItem[], domain: Domain | "Latest") {
@@ -309,8 +319,10 @@ export function isBreakingStory(item: RealIntelligenceItem, now = Date.now(), co
 
 export function verificationLabel(item: RealIntelligenceItem) {
   if (item.verificationStatus === "official") return "Official source";
-  if (item.verificationStatus === "corroborated") return `${item.independentSourceCount} sources confirm`;
-  return "Developing story";
+  if (item.verificationStatus === "corroborated") return item.corroborationBasis === "cve"
+    ? `${item.independentSourceCount} sources cover this CVE`
+    : `Confirmed by ${item.independentSourceCount} sources`;
+  return "Developing";
 }
 
 export function simpleSummary(item: RealIntelligenceItem) {

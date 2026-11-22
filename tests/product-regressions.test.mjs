@@ -178,9 +178,9 @@ test("news and notification controls share one combined preference object", asyn
 });
 
 test("trending sections use the same history-aware navigation path as the main navigation", async () => {
-  const app = await readFile(new URL("../app/cyber-chronicle-app.tsx", import.meta.url), "utf8");
-  assert.doesNotMatch(app, /onClick=\{\(\) => setActiveDomain\(domain\)\}/);
-  assert.match(app, /onClick=\{\(\) => handleDomainChange\(domain\)\}/);
+  const home = await readFile(new URL("../app/components/app-shell/HomeScreen.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(home, /onClick=\{\(\) => setActiveDomain\(domain\)\}/);
+  assert.match(home, /onClick=\{\(\) => handleDomainChange\(domain\)\}/);
 });
 
 test("intelligence filters use a single-row scrollable toolbar instead of inline wrapping", async () => {
@@ -242,14 +242,15 @@ test("creator identity and social destinations come from one shared project conf
     "https://github.com/Nikhilesh-CS",
     "https://www.instagram.com/nikhilesh._.18/",
   ]);
-  const [app, creator] = await Promise.all([
+  const [app, home, creator] = await Promise.all([
     readFile(new URL("../app/cyber-chronicle-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/app-shell/HomeScreen.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/settings/views/CreatorView.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(app, /CREATOR_LINKS\.map/);
-  assert.match(app, /className="creator-signature"/);
+  assert.match(home, /className="creator-signature"/);
   assert.match(app, /className="footer-creator"/);
   assert.match(creator, /className="creator-connect"/);
   assert.match(creator, /target="_blank" rel="noopener noreferrer"/);
-  assert.doesNotMatch(`${app}\n${creator}`, /linkedin\.com\/in\/nikhilesh|github\.com\/Nikhilesh-CS|instagram\.com\/nikhilesh/);
+  assert.doesNotMatch(`${app}\n${home}\n${creator}`, /linkedin\.com\/in\/nikhilesh|github\.com\/Nikhilesh-CS|instagram\.com\/nikhilesh/);
 });

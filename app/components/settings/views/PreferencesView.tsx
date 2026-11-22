@@ -10,6 +10,7 @@ import {
   type SeverityFloor,
 } from "../../../../lib/preferences";
 import { SettingsHeader } from "../SettingsHeader";
+import { readReaderBackup, STACK_PRODUCTS } from "../../../../lib/watchlist";
 
 const notificationOptions: readonly [keyof NotificationTypePreferences, string][] = [
   ["criticalAlerts", "Critical alerts"],
@@ -19,6 +20,7 @@ const notificationOptions: readonly [keyof NotificationTypePreferences, string][
   ["threatIntelligence", "Threat intelligence"],
   ["aiTechUpdates", "AI and technology updates"],
   ["generalNews", "General news"],
+  ["watchlist", "My stack matches"],
 ];
 
 export function PreferencesView({
@@ -31,6 +33,8 @@ export function PreferencesView({
   followedStateStoryCount,
   hasInterestProfile,
   onResetInterest,
+  saved,
+  onImportSaved,
 }: {
   onBack: () => void;
   preferences: AppPreferences;
@@ -41,8 +45,11 @@ export function PreferencesView({
   followedStateStoryCount: number;
   hasInterestProfile: boolean;
   onResetInterest: () => void;
+  saved: string[];
+  onImportSaved: (saved: string[]) => void;
 }) {
   const [fontSize, setFontSize] = useState(() => typeof window === "undefined" ? "medium" : window.localStorage.getItem("cyber-chronicle-font-size") || "medium");
+  const [backupStatus, setBackupStatus] = useState("");
   useEffect(() => { document.documentElement.dataset.fontSize = fontSize; window.localStorage.setItem("cyber-chronicle-font-size", fontSize); }, [fontSize]);
   const toggleDomain = (domain: Domain) => {
     const enabled = preferences.enabledDomains.includes(domain);
@@ -62,10 +69,56 @@ export function PreferencesView({
     notifications: { ...preferences.notifications, [key]: value },
   });
 
+  const downloadBackup = () => {
+    const content = JSON.stringify({ version: 1, saved, watchlist: preferences.watchlist }, null, 2);
+    const url = URL.createObjectURL(new Blob([content], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "cyber-chronicle-backup.json";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 5_000);
+  };
+
+  async function importBackup(file: File) {
+    try {
+      if (file.size > 256_000) throw new Error("Choose a backup smaller than 256 KB.");
+      const backup = readReaderBackup(JSON.parse(await file.text()));
+      onImportSaved([...new Set([...saved, ...backup.saved])]);
+      onChange({ ...preferences, watchlist: [...new Set([...preferences.watchlist, ...backup.watchlist])] });
+      setBackupStatus("Saved stories and products added to this device.");
+    } catch (error) {
+      setBackupStatus(error instanceof SyntaxError ? "This file is not valid JSON." : error instanceof Error ? error.message : "Could not read this backup.");
+    }
+  }
+
   return (
     <div className="settings-page">
       <SettingsHeader title="News & Personalization" onBack={onBack} />
       <div className="settings-page-content preferences-page">
+        <section className="preference-section">
+          <h2>My stack</h2>
+          <p>Choose products to highlight when an advisory lists them. Check your installed version before acting.</p>
+          <div className="preference-grid">{STACK_PRODUCTS.map((product) => <label key={product}><input type="checkbox" checked={preferences.watchlist.includes(product)} onChange={(event) => onChange({
+            ...preferences, watchlist: event.target.checked ? [...preferences.watchlist, product] : preferences.watchlist.filter((value) => value !== product),
+          })} />{product}</label>)}</div>
+        </section>
+        <section className="preference-section">
+          <h2>Display density</h2>
+          <div className="edition-switch" role="group" aria-label="Display density">
+            <button aria-pressed={preferences.density === "comfortable"} onClick={() => onChange({ ...preferences, density: "comfortable" })}>Comfortable</button>
+            <button aria-pressed={preferences.density === "compact"} onClick={() => onChange({ ...preferences, density: "compact" })}>Compact</button>
+          </div>
+        </section>
+        <section className="preference-section">
+          <h2>Back up reading data</h2>
+          <button className="text-button" onClick={downloadBackup}>Download backup</button>
+          <label className="preference-field">Import saved stories and products<input type="file" accept=".json,application/json" onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) void importBackup(file);
+            event.target.value = "";
+          }} /></label>
+          {backupStatus && <p role="status">{backupStatus}</p>}
+        </section>
         <section className="preference-section">
           <div className="preference-heading"><MapPin size={18} /><div><strong>Your state</strong><small>Stored only as a state name on this device</small></div></div>
           <button className="location-button" onClick={onRequestLocation} disabled={locating}>

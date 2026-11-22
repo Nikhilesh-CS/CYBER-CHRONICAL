@@ -1,5 +1,6 @@
 export const PROJECT = {
   name: "Cyber Chronicle",
+  repository: "https://github.com/Nikhilesh-CS/CYBER-CHRONICAL",
   creator: {
     name: "Nikhilesh",
     role: "Founder & Developer",

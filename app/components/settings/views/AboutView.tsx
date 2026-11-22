@@ -12,7 +12,7 @@ export function AboutView({ onBack }: { onBack: () => void }) {
             <strong>Cyber Chronicle</strong> is an independent cybersecurity intelligence and technology news platform designed to collect, organize and simplify information from trusted public sources.
           </p>
           <p>
-            It combines official advisories, cybersecurity research, threat intelligence and technology reporting into a structured intelligence feed.
+            The Cyber edition combines official advisories, research and source-linked security news. The General edition keeps wider reporting available. Cyber Academy connects guided defensive lessons to current stories.
           </p>
         </InfoBlock>
         

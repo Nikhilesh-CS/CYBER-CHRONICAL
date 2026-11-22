@@ -15,7 +15,7 @@ export function PrivacyView({ onBack }: { onBack: () => void }) {
 
         <InfoBlock>
           <p><strong>Local-only settings</strong></p>
-          <p style={{ color: "var(--ink-soft)" }}>Your enabled domains, severity choice, followed state, notification topics, and the identifiers of stories already checked are kept in browser storage on this device.</p>
+          <p style={{ color: "var(--ink-soft)" }}>Your preferences, watchlist, saved stories, Academy progress and the identifiers of stories already checked are kept in browser storage on this device. Backups are created and imported locally.</p>
         </InfoBlock>
 
         <InfoBlock>

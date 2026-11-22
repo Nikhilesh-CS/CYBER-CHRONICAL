@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { ExternalLink } from "lucide-react";
 import { SettingsHeader } from "../SettingsHeader";
-import { computeSourceGroup, type SourceGroup } from "../../../../lib/editorial";
+import { computeSourceGroup, formatDate, type SourceGroup } from "../../../../lib/editorial";
 import type { SourceResult } from "../../../../lib/news";
 import { getSourceDefinitions } from "../../../../lib/sources";
 
@@ -36,6 +36,7 @@ export function SourcesView({ onBack, sources }: { onBack: () => void; sources: 
     <div className="settings-page">
       <SettingsHeader title="Intelligence Sources" onBack={onBack} />
       <div className="settings-page-content">
+        <p><a href="https://github.com/Nikhilesh-CS/CYBER-CHRONICAL/issues/new?template=source.yml">Suggest a source</a></p>
         {(Object.keys(groupedSources) as SourceGroup[]).map((group) => {
           const groupSources = groupedSources[group];
           if (groupSources.length === 0) return null;
@@ -59,6 +60,8 @@ export function SourcesView({ onBack, sources }: { onBack: () => void; sources: 
                         <i /> {source.status === "current" ? "Current" : source.status === "stale" ? "Stale" : "Offline"}
                       </span>
                     </div>
+                    <span>Last successful check {source.retrievedAt ? `${formatDate(source.retrievedAt, true)} IST` : "unavailable"}</span>
+                    {source.error && <span className="settings-source-error">{source.error}</span>}
                   </div>;
                 })}
               </div>

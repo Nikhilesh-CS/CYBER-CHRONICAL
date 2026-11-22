@@ -1,3 +1,14 @@
 "use client";
 import { ShieldAlert } from "lucide-react";
-export function AffectedProducts({ affected, action }: { affected?: string; action?: string }) { if (!affected) return null; const products = affected.split(/[,;|]/).map((value) => value.trim()).filter(Boolean); return <div className="affected-products"><span>AFFECTED PRODUCTS</span><h3><ShieldAlert size={17} />Am I affected?</h3><p>Check whether you use any of these products or versions.</p><ul>{products.map((product) => <li key={product}>{product}</li>)}</ul>{action && <small>Recommended action: {action}</small>}</div> }
+import type { CyberMetadata } from "../../../lib/models";
+
+export function AffectedProducts({ metadata }: { metadata: CyberMetadata }) {
+  const listed = metadata.affected && !/^(?:check the linked source|specified in the official)/i.test(metadata.affected)
+    ? metadata.affected.split(" | ") : [];
+  const products = [...new Set([...listed, ...(metadata.vulnerabilities ?? []).flatMap(({ affected }) => affected ?? [])])];
+  return <section className="article-block affected-products">
+    <h2><ShieldAlert size={17} aria-hidden="true" /> Am I affected?</h2>
+    {products.length ? <><p>Compare your product and version with the linked advisory.</p><ul>{products.map((product) => <li key={product}>{product}</li>)}</ul></>
+      : <p>The available evidence does not identify affected products or versions.</p>}
+  </section>;
+}

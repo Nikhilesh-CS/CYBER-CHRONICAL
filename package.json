@@ -7,10 +7,13 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/build-next.mjs && node scripts/export-details.mjs && node scripts/generate-feed.mjs --export && node scripts/add-csp.mjs",
     "start": "npx serve out",
     "test": "npm run build && node --test tests/*.test.mjs",
     "news:update": "node scripts/update-news-snapshot.mjs && node scripts/generate-feed.mjs",
+    "news:check": "node scripts/check-edition.mjs",
+    "check:links": "node scripts/check-links.mjs",
+    "preview": "node scripts/serve-export.mjs",
     "lint": "eslint . --ignore-pattern out --ignore-pattern dist --ignore-pattern .next --ignore-pattern .venv"
   },
   "dependencies": {

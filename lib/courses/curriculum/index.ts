@@ -1,7 +1,60 @@
-import type { Course } from "../types";
-const lesson = (id: string, title: string, summary: string, steps: string[], question: string, answer: string, exercise: string): import("../types").Lesson => ({ id, title, summary, keyPoints: [summary, "Use the same mental model when reading a real security story."], animation: { template: "flow", steps, caution: "Pause here: this is the key idea to remember." }, quiz: { passThreshold: 0.7, questions: [{ id: `${id}-q1`, prompt: question, options: [{ id: "a", label: answer }, { id: "b", label: "A random screen refresh" }, { id: "c", label: "A battery setting" }], correctId: "a", explanation: "That is the core concept." }] }, exercise: { type: "short", prompt: exercise, answer, explanation: "Good reasoning. Connect the step to the outcome." } });
-export const COURSE_PATH: Course = { id: "cyber-academy", title: "Cyber Academy", description: "A guided path from internet basics to incident response, with interactive explanations and practice.", tiers: [
-  { id: "beginner", title: "Beginner", summary: "Build the foundations.", modules: [{ id: "internet", title: "How the internet works", summary: "The moving parts behind every website.", lessons: [lesson("clients-servers", "Clients, servers and requests", "A client asks; a server responds with data.", ["Your device", "Internet request", "Web server", "Response"], "What does a server do?", "It responds to requests", "In one phrase, what does a client send to a server?") , lesson("dns", "DNS: names into addresses", "DNS translates a human name into an IP address.", ["example.com", "DNS lookup", "IP address", "Connect"], "What does DNS provide?", "It provides an IP address", "What does DNS translate?")] }, { id: "security", title: "Security essentials", summary: "Think like a defender.", lessons: [lesson("cia-triad", "The CIA triad", "Confidentiality, integrity and availability describe security goals.", ["Data", "Confidentiality", "Integrity", "Availability"], "What does integrity protect?", "Data from unauthorized changes", "Name one part of the CIA triad.")] }] },
-  { id: "intermediate", title: "Intermediate", summary: "Understand common attack paths.", modules: [{ id: "web", title: "Web security", summary: "How browsers and web services communicate.", lessons: [lesson("https", "HTTP vs HTTPS", "HTTPS encrypts web traffic and authenticates the site.", ["Browser", "TLS handshake", "Encrypted channel", "Website"], "What does HTTPS add?", "Encryption and authentication", "What protects data in transit?") , lesson("sqli", "SQL injection", "Unsafe input can change the meaning of a database query.", ["Input", "Query", "Database", "Unexpected result"], "What causes SQL injection?", "Unsafe input changes a query", "What is the dangerous input entering?")] }, { id: "social", title: "Social engineering", summary: "Spot manipulation before it works.", lessons: [lesson("phishing", "Anatomy of phishing", "Phishing uses believable messages to steal actions or secrets.", ["Message", "Urgency", "Fake page", "Stolen credential"], "What is the attacker exploiting?", "Human trust", "What warning sign should you inspect first?")] }] },
-  { id: "advanced", title: "Advanced", summary: "Apply the ideas to real incidents.", modules: [{ id: "crypto", title: "Cryptography", summary: "Keys, signatures and trust.", lessons: [lesson("symmetric", "Symmetric encryption", "The same secret key encrypts and decrypts data.", ["Plaintext", "Secret key", "Ciphertext", "Secret key"], "What key decrypts symmetric ciphertext?", "The same secret key", "What must both parties protect?")] }, { id: "response", title: "Incident response", summary: "Move from detection to recovery.", lessons: [lesson("response-cycle", "Detect, contain, recover", "Incident response limits damage and restores trustworthy operations.", ["Detect", "Contain", "Eradicate", "Recover"], "What comes after detection?", "Containment", "What is the first response phase?")] }] },
-] };
+import type { Course } from "../types.ts";
+import { lesson as clientsServers } from "./beginner/clients-servers.ts";
+import { lesson as dns } from "./beginner/dns.ts";
+import { lesson as ciaTriad } from "./beginner/cia-triad.ts";
+import { lesson as passwords } from "./beginner/passwords.ts";
+import { lesson as phishing } from "./beginner/phishing.ts";
+import { lesson as malware } from "./beginner/malware.ts";
+import { lesson as https } from "./intermediate/https.ts";
+import { lesson as sqli } from "./intermediate/sqli.ts";
+import { lesson as networking } from "./intermediate/networking.ts";
+import { lesson as owasp } from "./intermediate/owasp.ts";
+import { lesson as linux } from "./intermediate/linux.ts";
+import { lesson as symmetric } from "./advanced/symmetric.ts";
+import { lesson as publicKey } from "./advanced/public-key.ts";
+import { lesson as responseCycle } from "./advanced/response-cycle.ts";
+import { lesson as threatHunting } from "./advanced/threat-hunting.ts";
+import { lesson as patchPriority } from "./advanced/patch-priority.ts";
+
+export const COURSE_PATH: Course = {
+  id: "cyber-academy",
+  title: "Cyber Academy",
+  description: "A guided path from internet basics to incident response.",
+  tiers: [
+    {
+      id: "beginner",
+      title: "Beginner",
+      summary: "Build the foundations.",
+      modules: [
+        { id: "internet", title: "How the internet works", summary: "Follow a request and find the address it needs.",
+          lessons: [clientsServers, dns] },
+        { id: "security", title: "Security essentials", summary: "Protect accounts and spot suspicious activity.",
+          lessons: [ciaTriad, passwords, phishing, malware] },
+      ],
+    },
+    {
+      id: "intermediate",
+      title: "Intermediate",
+      summary: "Review common risks and choose preventive controls.",
+      modules: [
+        { id: "web", title: "Web security", summary: "Protect connections, data access and database queries.",
+          lessons: [https, sqli, owasp] },
+        { id: "systems", title: "Networks and systems", summary: "Plan access to networks, files and processes.",
+          lessons: [networking, linux] },
+      ],
+    },
+    {
+      id: "advanced",
+      title: "Advanced",
+      summary: "Apply evidence to defensive decisions.",
+      modules: [
+        { id: "crypto", title: "Cryptography", summary: "Choose the right protection and verify key identity.",
+          lessons: [symmetric, publicKey] },
+        { id: "response", title: "Defensive operations", summary: "Investigate signals and prioritize remediation.",
+          lessons: [responseCycle, threatHunting, patchPriority] },
+      ],
+    },
+  ],
+};
+
+export const ACADEMY_LESSONS = COURSE_PATH.tiers.flatMap((tier) => tier.modules.flatMap((module) => module.lessons));

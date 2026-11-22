@@ -1,69 +1,51 @@
 # Cyber Chronicle
 
-**Trusted Cybersecurity News. Simplified.**
+A free, source-linked cybersecurity newspaper for students and working defenders.
 
-Cyber Chronicle is a student-friendly cybersecurity newspaper. It presents source-linked news from reviewed official, vendor, research, and cybersecurity-news publishers, then explains each record in clear language.
+[![Publish workflow](https://github.com/Nikhilesh-CS/CYBER-CHRONICAL/actions/workflows/free-pages.yml/badge.svg)](https://github.com/Nikhilesh-CS/CYBER-CHRONICAL/actions/workflows/free-pages.yml)
+[Read the live edition](https://nikhilesh-cs.github.io/CYBER-CHRONICAL/)
 
-## Free edition
+![Cyber Chronicle masthead on cream newsprint](public/og.png)
 
-This branch is designed to run for **₹0** on GitHub Pages:
+## What you can do
 
-- no database;
-- no public backend server;
-- no paid AI or API;
-- no ChatGPT subscription dependency;
-- no purchased domain;
-- no laptop exposed to the internet.
+- Browse the Cyber edition by default or switch to General for science, business, sport and other reporting.
+- Search with filters for severity, source, category, publication date and India coverage.
+- Inspect source links, public CVE evidence, affected products and published guidance.
+- Save stories, follow products in My stack, and export or restore your local reading data.
+- Catch up with [the daily and weekly digest](https://nikhilesh-cs.github.io/CYBER-CHRONICAL/digest/) or subscribe via [RSS](https://nikhilesh-cs.github.io/CYBER-CHRONICAL/feed.xml).
+- Work through Cyber Academy lessons with guided examples, quizzes, related stories and local progress.
 
-GitHub Actions retrieves source metadata on a schedule, creates a static JSON edition, and publishes static HTML, CSS, JavaScript, images, and JSON. When the scheduled updater is not running, the last successfully built edition remains readable.
+## How it runs
 
-Optional notifications are also local-first: the installed app compares each refreshed static edition with story identifiers stored on the device and displays matching alerts. No subscriber account, cloud messaging token, or notification database is used. Background checks depend on browser support and are best effort; opening or focusing the app always triggers the normal refresh path.
+GitHub Actions checks reviewed public feeds and official listings hourly. It uses CERT-In, NVD, the CVE Program, CISA KEV and FIRST EPSS for scoped evidence. It then builds the static Next.js export, search data, share pages, RSS feeds and the MiniLM related-story index. GitHub Pages serves the output.
 
-The scheduled build also runs a free local MiniLM embedding model. Semantic vectors and related-story links are published as `public/data/intelligence.json`; the browser learns an interest profile from opened and saved stories entirely in local storage. Personalized ranking is blended with editorial priority, so critical and verified reporting cannot be hidden by reader affinity. Breaking treatment uses severity, recency decay, source corroboration, and source-count velocity, and expires after two hours.
+The publish workflow checks critical source health, edition age and severity coverage before deployment. A failed check leaves the last successful deployment in place. The source screen shows the latest published check and any upstream errors included in that edition. The checked-in snapshot is an intentional local fallback for offline builds and tests.
 
-## How updates work
+Preferences, watchlist entries, saved IDs and Academy progress stay in the browser. Optional notifications are handled by the service worker on supported devices. No account, backend, database or paid API is required.
 
-1. The scheduled workflow checks the fixed reviewed source list.
-2. Only metadata required for attribution is collected: headline, publisher, publication time, category, and original link.
-3. Exact duplicates and closely related titles are compared conservatively.
-4. Beginner explanations are generated using deterministic rules, not a paid AI service.
-5. The workflow builds and publishes a new static edition.
+## Local setup
 
-The reader-facing **Refresh** button reloads the newest published snapshot. It does not contact publishers directly and does not claim that a new collection run happened.
-
-## Trusted-source rules
-
-- Every story links to its original publisher.
-- Single-source reports remain labelled as developing.
-- Official publication does not automatically mean active exploitation or a confirmed attack.
-- Missing severity, affected versions, or impact is never invented.
-- Source failures are shown honestly; a valid previous edition is kept instead of publishing an empty page.
-- Collected source content is treated as untrusted data.
-
-## Local use
-
-Requirements: Node.js 22.13 or newer.
+Use Node.js 22.13 or newer.
 
 ```powershell
-npm install
-npm run news:update
+npm ci
 npm run dev
 ```
 
-Static production verification:
+Run the production checks.
 
 ```powershell
+npm run lint
 npm test
+npm run check:links
+npm run preview
 ```
 
-The exported GitHub Pages site is written to `out`.
+The preview is served at `http://127.0.0.1:4173/CYBER-CHRONICAL/`. Run `npm run news:update` followed by `npm run news:check` for a current edition from upstream sources. Set `NEWS_DATA_DIR` to a temporary output directory if you want to keep the checked-in fallback files intact.
 
-## Free hosting
+## Sources and contributions
 
-The workflow in `.github/workflows/free-pages.yml` supports:
+Read the [editorial policy](docs/SOURCE_POLICY.md), [publisher registry](docs/SOURCES.md), and [contribution guide](CONTRIBUTING.md). Use [GitHub Issues](https://github.com/Nikhilesh-CS/CYBER-CHRONICAL/issues/new/choose) for ordinary reports and the [security policy](SECURITY.md) for sensitive reports.
 
-- an hourly scheduled refresh;
-- manual refresh from the GitHub Actions page;
-- static GitHub Pages deployment from the `main` branch.
-
-Publishing is intentionally separate from local development and should only be enabled after the owner reviews the static edition.
+Cyber Chronicle code is licensed under [MIT](LICENSE). Original stories, headlines, images, publisher excerpts and linked content retain their publishers’ rights.

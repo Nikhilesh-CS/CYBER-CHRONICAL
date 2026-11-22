@@ -8,6 +8,21 @@ export type JargonEntry = {
   matches: RegExp;
 };
 
+const LESSON_BY_TERM: Record<string, string> = {
+  "Rogue AI agent": "owasp", "AI agent": "owasp", Exploit: "patch-priority", "Zero-day": "patch-priority",
+  Vulnerability: "patch-priority", "Sandbox escape": "linux", Slopsquatting: "malware", ClickFix: "phishing",
+  "C2 (command and control)": "threat-hunting", RAT: "malware", Ransomware: "response-cycle",
+  Phishing: "phishing", "Privilege escalation": "linux", "Supply-chain attack": "malware",
+};
+
+export function glossaryEntryId(term: string) {
+  return `glossary-${term.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-$/, "")}`;
+}
+
+export function lessonForJargon(term: string) {
+  return LESSON_BY_TERM[term];
+}
+
 export const JARGON_DICTIONARY: JargonEntry[] = [
   {
     term: "Rogue AI agent",

@@ -1,8 +1,9 @@
 import type { RealIntelligenceItem } from "../models.ts";
 import type { SourceDefinition } from "../sources.ts";
-import { decodeHtml, stableHash, FETCH_TIMEOUT_MS, MAX_RESPONSE_BYTES } from "./utils.ts";
+import { decodeHtml, stableHash, fetchReviewed, FETCH_TIMEOUT_MS, MAX_RESPONSE_BYTES } from "./utils.ts";
 import { OFFICIAL_CYBER_TOPIC, TOPIC_FILTERS, enhanceCategories } from "../classifiers.ts";
 import { normalizeImageUrl } from "./html.ts";
+import { extractCveIds } from "../vulnerabilities/identifiers.ts";
 
 function xmlField(block: string, field: string): string {
   const match = new RegExp(`<${field}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${field}>`, "i").exec(block);
@@ -57,11 +58,11 @@ function extractImageUrl(block: string, baseUrl: string): string | undefined {
   return undefined;
 }
 
-export async function fetchXml(url: string, fetcher: typeof fetch): Promise<string> {
+export async function fetchXml(url: string, fetcher: typeof fetch, allowedHosts: string[] = []): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const response = await fetcher(url, {
+    const response = await fetchReviewed(url, [new URL(url).hostname, ...allowedHosts], fetcher, {
       cache: "no-store",
       headers: { accept: "application/rss+xml, application/xml, text/xml", "user-agent": "CyberChronicle/1.0" },
       signal: controller.signal,
@@ -83,15 +84,23 @@ export async function fetchXml(url: string, fetcher: typeof fetch): Promise<stri
 }
 
 export function parseRssFeed(xml: string, definition: SourceDefinition): RealIntelligenceItem[] {
-  if (!/<rss\b/i.test(xml) || !/<channel\b/i.test(xml)) throw new Error("Invalid upstream schema: RSS channel");
+  if (!/<(?:rss|rdf:RDF)\b/i.test(xml) || !/<channel\b/i.test(xml)) throw new Error("Invalid upstream schema: RSS channel");
   const blocks = [...xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)].map((match) => match[1]);
   if (blocks.length === 0) throw new Error("Invalid upstream schema: no RSS items");
+  return buildFeedItems(blocks.map((block) => ({
+    title: xmlField(block, "title"),
+    link: xmlField(block, "feedburner:origLink") || xmlField(block, "link"),
+    description: xmlField(block, "description"),
+    publishedRaw: xmlField(block, "pubDate") || xmlField(block, "dc:date"),
+    block,
+  })), definition);
+}
+
+type FeedRecord = { title: string; link: string; description?: string; publishedRaw: string; block?: string };
+
+export function buildFeedItems(records: FeedRecord[], definition: SourceDefinition): RealIntelligenceItem[] {
   const items: RealIntelligenceItem[] = [];
-  for (const block of blocks) {
-    const title = xmlField(block, "title");
-    const link = xmlField(block, "link");
-    const description = xmlField(block, "description");
-    const publishedRaw = xmlField(block, "pubDate") || xmlField(block, "dc:date");
+  for (const { title, link, description = "", publishedRaw, block = "" } of records) {
     if (!title || !link || !publishedRaw) continue;
     const haystack = `${title} ${description}`;
     const filter = definition.trustTier === 1 ? OFFICIAL_CYBER_TOPIC : TOPIC_FILTERS.cyber;
@@ -117,7 +126,9 @@ export function parseRssFeed(xml: string, definition: SourceDefinition): RealInt
       ? undefined
       : feedSummary(description, title) || undefined;
     
+    const cveIds = extractCveIds(`${title} ${description}`);
     const finalCategories = enhanceCategories(definition.categories, title, description);
+    if (cveIds.length && !finalCategories.includes("cyber")) finalCategories.push("cyber");
     const imageUrl = extractImageUrl(block, parsedUrl.origin);
     
     items.push({
@@ -127,6 +138,7 @@ export function parseRssFeed(xml: string, definition: SourceDefinition): RealInt
       summary: sourceSummary ?? (definition.feedSummaryPolicy === "metadata-only"
         ? "Cyber Chronicle retains only the headline, publisher, date, and link from this feed. Open the original report for its full context."
         : "The publisher did not include a usable summary in its feed. Open the source for complete context."),
+      ...(sourceSummary ? { summarySource: "feed" as const } : {}),
       publishedAt,
       updatedAt: publishedAt,
       categories: finalCategories,
@@ -138,6 +150,7 @@ export function parseRssFeed(xml: string, definition: SourceDefinition): RealInt
       independentSourceCount: 1,
       references: [parsedUrl.toString()],
       evidence: [{
+        sourceId: definition.id,
         publisher: definition.publisher,
         category: finalCategories[0],
         url: parsedUrl.toString(),
@@ -155,7 +168,7 @@ export function parseRssFeed(xml: string, definition: SourceDefinition): RealInt
             type: "cyber",
             severity: "Unknown",
             identifier,
-            affected: "Check the linked source for affected people, organisations, products, or versions",
+            ...(cveIds.length ? { cveIds } : {}),
           }
         : { type: "general" },
       ...(imageUrl ? { imageUrl } : {}),

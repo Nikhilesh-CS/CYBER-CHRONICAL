@@ -1,0 +1,21 @@
+name: Report a bug
+description: Report a reader, publication, or Academy issue
+title: "[Bug] "
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What happened?
+      description: Include the page or feature and what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser and device

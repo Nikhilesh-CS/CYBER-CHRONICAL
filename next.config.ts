@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   basePath,
   assetPrefix: basePath,
   images: { unoptimized: true },
+  turbopack: { root: process.cwd() },
+  ...(process.platform === "win32" ? { experimental: { workerThreads: true, cpus: 1 } } : {}),
 };
 
 export default nextConfig;

@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  ArrowRight, Bookmark, BookmarkCheck, Check, Clock3,
+  Bookmark, BookmarkCheck, Check, Clock3,
   ExternalLink, Printer, Type, X, ZoomIn,
 } from "lucide-react";
 import { motion } from "motion/react";
@@ -19,6 +19,9 @@ import { ShareButton } from "../shared/ShareButton";
 import { SourceComparison } from "./SourceComparison";
 import { AffectedProducts } from "./AffectedProducts";
 import { JargonHighlighter } from "./JargonHighlighter";
+import { VulnerabilityFacts } from "./VulnerabilityFacts";
+import { storyShareUrl } from "../../../lib/story-links";
+import { SeverityGauge } from "../shared/SeverityGauge";
 
 export function ArticleReader({ item, relatedItems, navigationItems, saved, onSave, onClose, onOpenRelated }: {
   item: RealIntelligenceItem;
@@ -33,6 +36,7 @@ export function ArticleReader({ item, relatedItems, navigationItems, saved, onSa
   const [progress, setProgress] = useState(0);
   const [showMiniHeader, setShowMiniHeader] = useState(false);
   const [imageOpen, setImageOpen] = useState(false);
+  const [technical, setTechnical] = useState(false);
   const swipeStart = useRef<number | null>(null);
   const readerRef = useRef<HTMLElement>(null);
   useEffect(() => { readerRef.current?.focus(); }, []);
@@ -40,6 +44,8 @@ export function ArticleReader({ item, relatedItems, navigationItems, saved, onSa
   const jargon = jargonFor(item);
   const title = plainTitle(item);
   const explanation = beginnerExplanation(item);
+  const cyber = item.metadata.type === "cyber" ? item.metadata : undefined;
+  const shareUrl = storyShareUrl(item);
   const cycleReadingSize = () => {
     const current = document.documentElement.dataset.fontSize || "medium";
     const next = current === "small" ? "medium" : current === "medium" ? "large" : "small";
@@ -64,7 +70,7 @@ export function ArticleReader({ item, relatedItems, navigationItems, saved, onSa
         <i className="reading-progress" style={{ transform: `scaleX(${progress})` }} aria-hidden="true" />
         <aside className="reader-action-rail" aria-label="Reader actions">
           <button onClick={() => { haptic(); onSave(); }} aria-label={saved ? "Remove saved story" : "Save story"}>{saved ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}<span>{saved ? "Saved" : "Save"}</span></button>
-          <ShareButton title={title} text={explanation} variant="icon" />
+          <ShareButton title={title} text={explanation} url={shareUrl} variant="icon" />
           <button onClick={cycleReadingSize} aria-label="Change reading size"><Type size={18} /><span>Text</span></button>
           <button onClick={() => window.print()} aria-label="Print edition"><Printer size={18} /><span>Print</span></button>
         </aside>
@@ -86,14 +92,19 @@ export function ArticleReader({ item, relatedItems, navigationItems, saved, onSa
             )}
             <span className="article-section">{computeIntelligenceType(item)}</span>
             <h1 id="article-title">{title}</h1>
-            <p className="article-deck">{explanation}</p>
-            <div className="article-byline"><div className="author-mark">CC</div><span><strong>Cyber Chronicle Newsroom</strong><small>Published {formatDate(item.publishedAt, true)} IST · Updated from live sources</small></span></div>
+            <div className="edition-switch" role="group" aria-label="Explanation detail">
+              <button aria-pressed={!technical} onClick={() => setTechnical(false)}>Beginner</button>
+              <button aria-pressed={technical} onClick={() => setTechnical(true)}>Technical</button>
+            </div>
+            <p className="article-deck">{technical ? item.summary : explanation}</p>
+            <div className="article-byline"><div className="author-mark">CC</div><span><strong>Cyber Chronicle Newsroom</strong><small>Published {formatDate(item.publishedAt, true)} IST</small></span></div>
             <StoryMeta item={item} />
+            {cyber && <SeverityGauge severity={cyber.severity} />}
           </header>
 
           <section className="article-block quick-summary"><span>QUICK SUMMARY</span><p>{simpleSummary(item)}</p></section>
 
-          <section className="article-block simple-words">
+          {!technical && <section className="article-block simple-words">
             <span>IN SIMPLE WORDS</span>
             <h2>Here&apos;s what this means</h2>
             <p><JargonHighlighter text={explanation} /></p>
@@ -114,7 +125,7 @@ export function ArticleReader({ item, relatedItems, navigationItems, saved, onSa
                 </div>
               </div>
             )}
-          </section>
+          </section>}
 
           <section className="article-block">
             <span>WHY IT MATTERS</span>
@@ -144,14 +155,15 @@ export function ArticleReader({ item, relatedItems, navigationItems, saved, onSa
               <p><strong>Independent sources:</strong> {item.independentSourceCount}</p>
               {item.metadata.type === "cyber" && item.metadata.severity && <p><strong>Severity:</strong> {item.metadata.severity}</p>}
               {item.metadata.type === "cyber" && item.metadata.identifier && <p><strong>Identifier:</strong> {item.metadata.identifier}</p>}
-              {item.metadata.type === "cyber" && item.metadata.affected && <p><strong>Affected:</strong> {item.metadata.affected}</p>}
-              {item.metadata.type === "cyber" && item.metadata.action && <p><strong>Recommended action:</strong> {item.metadata.action}</p>}
             </div>
           </section>
+
+          {cyber && <AffectedProducts metadata={cyber} />}
 
           <section className="article-block">
             <span>WHAT YOU SHOULD DO</span>
             <h2>Practical next steps</h2>
+            {cyber?.action && <p><strong>Advisory guidance</strong> {cyber.action} {cyber.advisoryUrl && <a href={cyber.advisoryUrl}>Official notice</a>}</p>}
             <ol className="action-list">{practicalActions(item).map((action, index) => <li key={action}><b>{index + 1}</b><span>{action}</span></li>)}</ol>
           </section>
 
@@ -166,36 +178,20 @@ export function ArticleReader({ item, relatedItems, navigationItems, saved, onSa
             {showComparison && <SourceComparison item={item} onClose={() => setShowComparison(false)} />}
           </section>
 
-          {item.metadata.type === "cyber" && <AffectedProducts affected={item.metadata.affected} action={item.metadata.action} />}
+          {cyber && <VulnerabilityFacts metadata={cyber} />}
 
           {relatedItems.length > 0 && (
             <section className="article-block related-coverage">
-              <span>CONNECTED INTELLIGENCE</span>
               <h2>Related coverage</h2>
-              <p>Semantically linked reports that add context, corroboration, or another angle.</p>
-              <div className="related-story-graph">
-                <div className="related-story-hub"><b>Current</b><small>{computeIntelligenceType(item)}</small></div>
-                {relatedItems.map((related, index) => (
-                  <motion.button
-                    key={related.id}
-                    className="related-story-node"
-                    initial={{ opacity: 0, scale: 0.92 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.05 }}
-                    onClick={() => onOpenRelated(related)}
-                  >
-                    <small>{computeIntelligenceType(related)}</small>
-                    <strong>{plainTitle(related)}</strong>
-                    <span>{related.primaryPublisher}<ArrowRight size={14} /></span>
-                  </motion.button>
-                ))}
-              </div>
+              <ul>{relatedItems.slice(0, 5).map((related) => <li key={related.id}>
+                <button className="text-button" onClick={() => onOpenRelated(related)}>{plainTitle(related)}</button>
+                <small>{related.primaryPublisher}</small>
+              </li>)}</ul>
             </section>
           )}
 
           <div className="article-share-cta">
-            <ShareButton title={title} text={explanation} variant="button" />
+            <ShareButton title={title} text={explanation} url={shareUrl} variant="button" />
           </div>
 
           <div className="article-end"><span>CC</span><p>Cyber Chronicle — Trusted Cybersecurity News. Simplified.</p><a href={`https://github.com/Nikhilesh-CS/CYBER-CHRONICAL/issues/new?title=Outdated%20story%3A%20${encodeURIComponent(title)}`} target="_blank" rel="noopener noreferrer">Report outdated story ↗</a></div>

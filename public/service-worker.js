@@ -1,5 +1,5 @@
 const STATIC_CACHE = "cyber-chronicle-static-v4";
-const DATA_CACHE = "cyber-chronicle-data-v1";
+const DATA_CACHE = "cyber-chronicle-data-v2";
 const OFFLINE_CACHE = "cyber-chronicle-offline-v1";
 const NOTIFICATION_CACHE = "cyber-chronicle-notifications-v1";
 const NOTIFICATION_STATE_URL = new URL(".notification-state", self.registration.scope).href;
@@ -12,6 +12,7 @@ const DEFAULT_NOTIFICATION_TOPICS = {
   threatIntelligence: true,
   aiTechUpdates: false,
   generalNews: false,
+  watchlist: true,
 };
 const DEFAULT_PREFERENCES = {
   enabledDomains: ["Cybersecurity", "AI & Technology", "Business", "Markets", "World", "India", "Science", "Space", "Environment", "Sports", "Entertainment"],
@@ -27,6 +28,7 @@ function normalizePreferences(value) {
     enabledDomains: Array.isArray(input.enabledDomains) && input.enabledDomains.length ? input.enabledDomains : DEFAULT_PREFERENCES.enabledDomains,
     severityFloor: input.severityFloor === "high" || input.severityFloor === "critical" ? input.severityFloor : "all",
     followedState: typeof input.followedState === "string" && input.followedState ? input.followedState : null,
+    watchlist: Array.isArray(input.watchlist) ? input.watchlist.filter((value) => typeof value === "string" && /^[a-z]{2,24}$/i.test(value)).slice(0, 20) : [],
     notifications: { ...DEFAULT_NOTIFICATION_TOPICS, ...legacyTopics },
   };
 }
@@ -43,7 +45,7 @@ self.addEventListener("activate", (event) => {
     caches.keys()
       .then((keys) => Promise.all(
         keys
-          .filter((key) => key !== STATIC_CACHE && key !== DATA_CACHE && key !== OFFLINE_CACHE && key !== NOTIFICATION_CACHE)
+          .filter((key) => key.startsWith("cyber-chronicle-") && key !== STATIC_CACHE && key !== DATA_CACHE && key !== OFFLINE_CACHE && key !== NOTIFICATION_CACHE)
           .map((key) => caches.delete(key)),
       ))
       .then(() => self.clients.claim()),
@@ -57,28 +59,24 @@ self.addEventListener("fetch", (event) => {
   if (
     request.method !== "GET"
     || url.origin !== self.location.origin
+    || !url.pathname.startsWith(new URL(self.registration.scope).pathname)
   ) {
     return;
   }
 
-  /* ---- Stale-while-revalidate for newsroom data ---- */
-  if (url.pathname.endsWith("/data/news.json") || url.pathname.endsWith("/data/intelligence.json")) {
+  /* ---- Network-first, with a fixed URL key for each edition file ---- */
+  if (url.pathname.endsWith("/data/news.json") || url.pathname.endsWith("/data/intelligence.json") || url.pathname.endsWith("/data/search.json")) {
     event.respondWith(
       caches.open(DATA_CACHE).then(async (cache) => {
-        const cached = await cache.match(request);
-        const networkPromise = fetch(request)
-          .then((response) => {
-            if (response.ok) cache.put(request, response.clone());
-            return response;
-          })
-          .catch(() => null);
-        if (cached) {
-          /* Return cached immediately, update in background */
-          void networkPromise; // fire-and-forget
-          return cached;
+        const key = new URL(url.pathname, url.origin).href;
+        const response = await fetch(request, { signal: AbortSignal.timeout(8_000) }).catch(() => null);
+        if (response?.ok && response.headers.get("content-type")?.includes("application/json")) {
+          await cache.put(key, response.clone());
+          return response;
         }
-        const networkResponse = await networkPromise;
-        return networkResponse || new Response(JSON.stringify({
+        const cached = await cache.match(key);
+        if (cached) return cached;
+        return response || new Response(JSON.stringify({
           state: "unavailable",
           generatedAt: new Date().toISOString(),
           lastSuccessfulAt: null,
@@ -86,7 +84,7 @@ self.addEventListener("fetch", (event) => {
           notice: "You are offline. No cached edition is available.",
           items: [],
           sources: [],
-        }), { headers: { "content-type": "application/json" } });
+        }), { status: 503, headers: { "content-type": "application/json" } });
       }),
     );
     return;
@@ -110,14 +108,14 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
-        .then((response) => {
+        .then(async (response) => {
           if (response.ok) {
-            const clone = response.clone();
-            caches.open(OFFLINE_CACHE).then((cache) => cache.put(request, clone));
+            const cache = await caches.open(OFFLINE_CACHE);
+            await cache.put(url.pathname, response.clone());
           }
           return response;
         })
-        .catch(() => caches.match(request).then((cached) => cached || caches.match("/"))),
+        .catch(async () => (await caches.match(url.pathname)) || (await caches.match(self.registration.scope)) || Response.error()),
     );
     return;
   }
@@ -200,7 +198,14 @@ function matchesPreferences(item, preferences) {
   const classification = classify(item);
   return normalized.enabledDomains.includes(itemDomain(item))
     && meetsSeverityFloor(item, normalized.severityFloor)
-    && Boolean(normalized.notifications[classification.preference]);
+    && (Boolean(normalized.notifications[classification.preference]) || matchingStack(item, normalized).length > 0);
+}
+
+function matchingStack(item, preferences) {
+  if (!preferences.notifications.watchlist || item.metadata?.type !== "cyber") return [];
+  const affected = [item.metadata.affected, ...(item.metadata.vulnerabilities || []).flatMap((record) => record.affected || [])].join(" ");
+  const text = ` ${affected.toLowerCase().replace(/[^a-z0-9]+/g, " ")} `;
+  return preferences.watchlist.filter((product) => text.includes(` ${product.toLowerCase()} `));
 }
 
 async function processNotificationItems(items) {
@@ -215,18 +220,21 @@ async function processNotificationItems(items) {
   }
 
   const seen = new Set(state.seenIds || []);
-  const newItems = items.filter((item) => item?.id && !seen.has(item.id));
+  const newItems = items.filter((item) => item?.id && !seen.has(item.id) && !item.aliases?.some((id) => seen.has(id)));
   const preferences = normalizePreferences(state.preferences);
   const eligible = newItems
     .filter((item) => matchesPreferences(item, preferences))
-    .sort((left, right) => Number(right.state === preferences.followedState) - Number(left.state === preferences.followedState))
+    .sort((left, right) => Number(matchingStack(right, preferences).length > 0) - Number(matchingStack(left, preferences).length > 0)
+      || Number(right.state === preferences.followedState) - Number(left.state === preferences.followedState))
     .slice(0, 3);
   for (const item of eligible) {
     const classification = classify(item);
+    const stack = matchingStack(item, preferences);
     const severity = item.metadata?.type === "cyber" ? item.metadata.severity || "Unknown" : "Unknown";
     const imageUrl = /^https:\/\//i.test(item.imageUrl || "") ? item.imageUrl : new URL("og.png", self.registration.scope).href;
-    await self.registration.showNotification(classification.title, {
+    await self.registration.showNotification(stack.length ? "Cyber Chronicle · My stack" : classification.title, {
       body: `${plainTitle(item)}\n\n${item.primaryPublisher}${severity !== "Unknown" ? ` · ${severity}` : ""}`
+        + (stack.length ? `\n\nMy stack: ${stack.join(", ")}` : "")
         + (item.metadata?.type === "cyber" && item.metadata.affected ? `\n\nAffects: ${item.metadata.affected}` : "")
         + (item.metadata?.type === "cyber" && item.metadata.action ? `\n\nNext step: ${item.metadata.action}` : ""),
       image: imageUrl,

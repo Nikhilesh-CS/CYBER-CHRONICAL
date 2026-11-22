@@ -5,8 +5,12 @@ export function beginnerExplanation(item: RealIntelligenceItem) {
   const title = plainTitle(item);
   const text = title.toLowerCase();
   const summary = item.summary.trim();
+  if (item.summarySource === "advisory") return summary;
+  if (item.summarySource === "feed" && item.categories.includes("cyber")) return `${item.primaryPublisher} reports: ${summary}`;
   const hasPublisherSummary = Boolean(summary)
     && !/^source metadata only\b/i.test(summary)
+    && !/^cyber chronicle retains only\b/i.test(summary)
+    && !/^official cert-in metadata record\b/i.test(summary)
     && !/^the publisher did not include a usable summary\b/i.test(summary);
   const sourceContext = hasPublisherSummary
     ? ` ${item.primaryPublisher}'s feed summary says: ${summary}`
@@ -33,7 +37,7 @@ export function beginnerExplanation(item: RealIntelligenceItem) {
   if (/\btelegram\b.*\bc2\b|\bc2\b.*\btelegram\b/.test(text)) {
     return "The report says attackers used Telegram as a hidden remote-control channel for infected computers, allowing them to send instructions without running their own obvious server.";
   }
-  if (/\b(?:exploit|exploited|vulnerabilit|flaw|zero.day)\b/.test(text)) {
+  if (/\b(?:exploits?|exploited|vulnerabilit(?:y|ies)|flaws?|zero.day)\b/.test(text)) {
     return "The report says researchers or attackers found a weakness in the named software. If the weakness can be used in an attack, affected users may need an official update or other vendor guidance.";
   }
   if (/\bdata breach\b|\bleak(?:ed)?\b|\bexposed\b.*\bdata\b/.test(text)) {

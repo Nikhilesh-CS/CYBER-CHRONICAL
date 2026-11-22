@@ -52,8 +52,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-intelligence-
 
+      - name: Restore cached vulnerability data
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .cache/vulnerabilities
+          key: ${{ runner.os }}-vulnerability-data-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-vulnerability-data-
+
       - name: Collect trusted-source metadata
         run: npm run news:update
+
+      - name: Require a recent edition and current Tier-1 sources
+        run: npm run news:check
 
       - name: Build the static newspaper
         env:

@@ -1,0 +1,23 @@
+name: Suggest a source
+description: Propose a publisher or official feed for source review
+title: "[Source] "
+body:
+  - type: input
+    id: publisher
+    attributes:
+      label: Publisher and official URL
+    validations:
+      required: true
+  - type: input
+    id: feed
+    attributes:
+      label: Feed or listing URL
+    validations:
+      required: true
+  - type: textarea
+    id: relevance
+    attributes:
+      label: What does the publisher add?
+      description: Describe its coverage, its relationship to other sources, and any published reuse policy.
+    validations:
+      required: true

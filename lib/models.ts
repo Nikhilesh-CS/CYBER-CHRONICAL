@@ -5,6 +5,7 @@ export type StoryState = "confirmed" | "developing";
 export type ConfidenceLabel = "High" | "Medium" | "Low";
 
 export type EvidenceLink = {
+  sourceId?: string;
   publisher: string;
   category: string; 
   url: string;
@@ -20,6 +21,22 @@ export type CyberMetadata = {
   affected?: string;
   action?: string;
   dueDate?: string;
+  cveIds?: string[];
+  vulnerabilities?: VulnerabilityEvidence[];
+  advisoryUrl?: string;
+};
+
+export type VulnerabilityEvidence = {
+  id: string;
+  cveUrl?: string;
+  nvdUrl?: string;
+  vendorUrl?: string;
+  severity?: Exclude<CyberMetadata["severity"], "Unknown">;
+  cvssScore?: number;
+  affected?: string[];
+  action?: string;
+  kev?: { url: string; dateAdded: string; dueDate?: string; action?: string };
+  epss?: { probability: number; date: string; url: string };
 };
 
 export type GeneralMetadata = {
@@ -33,6 +50,7 @@ export type RealIntelligenceItem = {
   sourceId: string; // Keep this as it's used internally
   title: string;
   summary: string;
+  summarySource?: "feed" | "advisory";
 
   publishedAt: string;
   updatedAt: string;
@@ -49,6 +67,8 @@ export type RealIntelligenceItem = {
   confidence: ConfidenceLabel;
 
   independentSourceCount: number;
+  corroborationBasis?: "headline" | "cve";
+  aliases?: string[];
   evidence: EvidenceLink[];
   references: string[]; // Keep this as it's used internally
 

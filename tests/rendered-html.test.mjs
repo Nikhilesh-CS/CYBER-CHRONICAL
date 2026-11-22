@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
+import { createHash } from "node:crypto";
+import { storySlug } from "../lib/story-links.ts";
 
 test("exports the Cyber Chronicle digital newspaper as static HTML", async () => {
   const html = await readFile(new URL("../out/index.html", import.meta.url), "utf8");
@@ -24,11 +26,28 @@ test("exports the Cyber Chronicle digital newspaper as static HTML", async () =>
   assert.doesNotMatch(html, /Helios Edge|Northstar Cloud|EmberLock|QuartzMail|Orion Systems/i);
 });
 
+test("exports a share page and hashes the bundled inline scripts in the CSP", async () => {
+  const [html, data] = await Promise.all([
+    readFile(new URL("../out/index.html", import.meta.url), "utf8"),
+    readFile(new URL("../out/data/news.json", import.meta.url), "utf8").then(JSON.parse),
+  ]);
+  assert.match(html, /Content-Security-Policy/);
+  const inline = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)].find(([, attributes, body]) => body && !/\bsrc=/i.test(attributes));
+  assert.ok(inline);
+  const hash = createHash("sha256").update(inline[2].replace(/\r\n?/g, "\n")).digest("base64");
+  assert.ok(html.includes(`'sha256-${hash}'`));
+  const story = await readFile(new URL(`../out/stories/${storySlug(data.items[0].id)}/index.html`, import.meta.url), "utf8");
+  assert.match(story, /og:type" content="article/);
+  assert.match(story, /Original evidence/);
+  assert.match(story, /Content-Security-Policy/);
+});
+
 test("ships product metadata and removes disposable starter assets", async () => {
-  const [layout, page, app, articleReader, jargonLib, packageJson, manifest, serviceWorker] = await Promise.all([
+  const [layout, page, app, home, articleReader, jargonLib, packageJson, manifest, serviceWorker] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/cyber-chronicle-app.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/app-shell/HomeScreen.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/components/article/ArticleReader.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/jargon.ts", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
@@ -50,7 +69,7 @@ test("ships product metadata and removes disposable starter assets", async () =>
   assert.match(articleReader, /SHOULD YOU CARE\?/);
   assert.match(articleReader, /WHAT YOU SHOULD DO/);
   assert.match(articleReader, /SOURCES & TRANSPARENCY/);
-  assert.match(app, /No invented facts/);
+  assert.match(home, /No invented facts/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   assert.equal(JSON.parse(manifest).display, "standalone");
   assert.match(serviceWorker, /request\.mode === "navigate"/);

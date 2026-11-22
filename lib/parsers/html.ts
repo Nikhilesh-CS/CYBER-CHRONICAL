@@ -1,6 +1,8 @@
 import type { RealIntelligenceItem } from "../models.ts";
 import type { LegacyCertInDefinition } from "../sources.ts";
-import { decodeHtml, FETCH_TIMEOUT_MS, MAX_RESPONSE_BYTES } from "./utils.ts";
+import { decodeHtml, fetchReviewed, FETCH_TIMEOUT_MS, MAX_RESPONSE_BYTES } from "./utils.ts";
+import { extractCveIds } from "../vulnerabilities/identifiers.ts";
+import type { CyberMetadata } from "../models.ts";
 
 const CERT_IN_ORIGIN = "https://www.cert-in.org.in";
 const MAX_ITEMS_PER_SOURCE = 100;
@@ -102,10 +104,9 @@ async function fetchArticleImageUrl(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), ARTICLE_IMAGE_TIMEOUT_MS);
   try {
-    const response = await fetcher(requestedUrl.toString(), {
+    const response = await fetchReviewed(requestedUrl.toString(), allowedHosts, fetcher, {
       cache: "no-store",
       headers: { accept: "text/html", "user-agent": "CyberChronicle/1.0" },
-      redirect: "follow",
       signal: controller.signal,
     });
     if (!response.ok) return undefined;
@@ -151,23 +152,28 @@ function parseCertInDate(value: string): string {
   return new Date(timestamp).toISOString();
 }
 
-export async function fetchHtml(url: string, fetcher: typeof fetch): Promise<string> {
+export async function fetchHtml(url: string, fetcher: typeof fetch, allowedHosts = [new URL(url).hostname]): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const response = await fetcher(url, {
+    const response = await fetchReviewed(url, allowedHosts, fetcher, {
       cache: "no-store",
       headers: { accept: "text/html", "user-agent": "CyberChronicle/1.0" },
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(`Upstream returned HTTP ${response.status}`);
+    const finalUrl = new URL(response.url || url);
+    if (finalUrl.protocol !== "https:" || !allowedHosts.includes(finalUrl.hostname)) {
+      throw new Error("Upstream redirected to an unreviewed origin");
+    }
     const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
     if (!contentType.includes("text/html")) throw new Error("Upstream returned a non-HTML response");
     const declaredLength = Number(response.headers.get("content-length") ?? 0);
     if (declaredLength > MAX_RESPONSE_BYTES) throw new Error("Upstream response is too large");
     const bytes = await response.arrayBuffer();
     if (bytes.byteLength > MAX_RESPONSE_BYTES) throw new Error("Upstream response is too large");
-    return new TextDecoder("windows-1252").decode(bytes);
+    const encoding = /(?:windows-1252|iso-8859-1)/i.test(contentType) ? "windows-1252" : "utf-8";
+    return new TextDecoder(encoding).decode(bytes);
   } catch (error) {
     if (controller.signal.aborted) throw new Error("Upstream request timed out");
     throw error;
@@ -177,7 +183,8 @@ export async function fetchHtml(url: string, fetcher: typeof fetch): Promise<str
 }
 
 export function parseCertInIndex(html: string, definition: LegacyCertInDefinition): RealIntelligenceItem[] {
-  if (!/Indian Computer Emergency Response Team/i.test(html) || !/Government of India/i.test(html)) {
+  if (!/Indian\s+Computer\s+Emergency\s+Response\s+Team/i.test(html)
+      || !/(?:Government of India|Ministry of Electronics\s*(?:&amp;|&|and)\s*Information Technology)/i.test(decodeHtml(html))) {
     throw new Error("Invalid upstream schema: CERT-In authority markers");
   }
 
@@ -221,6 +228,7 @@ export function parseCertInIndex(html: string, definition: LegacyCertInDefinitio
       independentSourceCount: 1,
       references: [reference],
       evidence: [{
+        sourceId: definition.id,
         publisher: definition.publisher,
         category: definition.categories.includes("cyber") ? "official" : definition.categories[0],
         url: reference,
@@ -235,7 +243,7 @@ export function parseCertInIndex(html: string, definition: LegacyCertInDefinitio
         type: "cyber",
         severity: "Unknown",
         identifier,
-        affected: "Specified in the official CERT-In record",
+        ...(extractCveIds(title).length ? { cveIds: extractCveIds(title) } : {}),
       },
     });
     seen.add(identifier);
@@ -245,4 +253,44 @@ export function parseCertInIndex(html: string, definition: LegacyCertInDefinitio
     throw new Error(`Invalid upstream schema: no ${identifierPrefix} records`);
   }
   return items;
+}
+
+export function applyCertInDetails(item: RealIntelligenceItem, html: string): RealIntelligenceItem {
+  if (item.metadata.type !== "cyber" || !item.metadata.identifier) return item;
+  const text = decodeHtml(html);
+  if (!text.includes(item.metadata.identifier) || !/Indian Computer Emergency Response Team/i.test(html)) return item;
+
+  const section = (heading: string) => new RegExp(
+    `<p\\b[^>]*>\\s*${heading}\\s*:?\\s*<\\/p>([\\s\\S]*?)(?=<p\\b[^>]*\\bverblue\\b|$)`, "i",
+  ).exec(html)?.[1] ?? "";
+  const rating = /\bSeverity Rating\s*:\s*(Critical|High|Medium|Low)\b/i.exec(text)?.[1];
+  const severity = rating ? `${rating[0].toUpperCase()}${rating.slice(1).toLowerCase()}` as CyberMetadata["severity"] : undefined;
+  const affected = [...section("Software Affected").matchAll(/<li\b[^>]*>([\s\S]*?)(?:<\/li>|(?=<li\b))/gi)]
+    .map(([, product]) => decodeHtml(product).slice(0, 160))
+    .filter(Boolean);
+  const products = [...new Set(affected)].slice(0, 12);
+  const solution = decodeHtml(section("Solutions?"));
+  const action = /\b(?:apply|install|upgrade|patch|update)\b/i.test(solution)
+    ? "Check your installed version against the official notice and follow its vendor update instructions."
+    : /\b(?:mitigations?|workarounds?)\b/i.test(solution)
+      ? "Review and apply the mitigations listed in the official notice if they apply to your systems."
+      : undefined;
+  const cveIds = extractCveIds(text);
+  const details = [
+    severity && `CERT-In rates this notice ${severity.toLowerCase()} severity.`,
+    products.length > 0 && `The affected list includes ${products.slice(0, 3).join(", ")}.`,
+    action,
+  ].filter(Boolean).join(" ");
+
+  return {
+    ...item,
+    ...(details ? { summary: details, summarySource: "advisory" as const } : {}),
+    metadata: {
+      ...item.metadata,
+      ...(severity ? { severity } : {}),
+      ...(products.length ? { affected: products.join(" | ") } : {}),
+      ...(action ? { action, advisoryUrl: item.references[0] } : {}),
+      ...(cveIds.length ? { cveIds } : {}),
+    },
+  };
 }

@@ -49,3 +49,7 @@ yarn-error.log*
 
 # typescript
 next-env.d.ts
+*.tsbuildinfo
+/public/data/search.json
+/public/feeds/
+/.lighthouseci/

@@ -10,6 +10,10 @@ import { beginnerExplanation } from "../../../lib/explanations";
 import { StoryMeta } from "../shared/StoryMeta";
 import { StoryImage, type ImageVariant } from "../shared/StoryImage";
 import { SeverityGauge } from "../shared/SeverityGauge";
+import { ShareButton } from "../shared/ShareButton";
+import { storyShareUrl } from "../../../lib/story-links";
+import { matchingProducts } from "../../../lib/watchlist";
+import { WatchlistContext } from "../shared/WatchlistContext";
 
 export type CardVariant = "lead" | "feature" | "standard" | "compact" | "alert" | "text-only";
 
@@ -29,6 +33,9 @@ export function NewsCard({
   const touchStart = React.useRef<number | null>(null);
   const domain = computeDomain(item);
   const intelType = computeIntelligenceType(item);
+  const cyber = item.metadata.type === "cyber" ? item.metadata : undefined;
+  const knownExploitation = cyber?.vulnerabilities?.find(({ kev }) => Boolean(kev));
+  const products = matchingProducts(item, React.useContext(WatchlistContext));
 
   let finalVariant: CardVariant = variant ?? "standard";
 
@@ -73,16 +80,21 @@ export function NewsCard({
         <div className="card-kicker">
           <div className="category-chips">
             <span className="category-chip">[{intelType.toUpperCase()}]</span>
+            {cyber && <SeverityGauge severity={cyber.severity} />}
+            {knownExploitation && <span className="kev-label" title={knownExploitation.id}>Actively exploited · {knownExploitation.id}</span>}
+            {products.length > 0 && <span className="watchlist-label">My stack · {products.join(", ")}</span>}
           </div>
-          <button className="save-story" onClick={onSave} aria-label={saved ? "Remove saved story" : "Save story"}>
-            {saved ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}
-          </button>
+          <div className="card-actions">
+            <button className="save-story" onClick={onSave} aria-pressed={saved} aria-label={saved ? "Remove saved story" : "Save story"}>
+              {saved ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}
+            </button>
+            <ShareButton title={plainTitle(item)} text={beginnerExplanation(item)} url={storyShareUrl(item)} />
+          </div>
         </div>
         <h3>{plainTitle(item)}</h3>
         {finalVariant !== "compact" && finalVariant !== "alert" && <p>{beginnerExplanation(item)}</p>}
         {finalVariant === "alert" && <p className="alert-desc">{beginnerExplanation(item)}</p>}
         <StoryMeta item={item} />
-        {item.metadata?.type === "cyber" && <SeverityGauge severity={item.metadata.severity} />}
       </div>
     </motion.article>
   );
