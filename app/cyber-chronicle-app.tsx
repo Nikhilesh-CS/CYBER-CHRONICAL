@@ -38,6 +38,7 @@ import { SITE_BASE_PATH } from "../lib/story-links";
 import { AcademyView } from "./components/academy/AcademyView";
 import { DEFAULT_ACADEMY_PROGRESS, loadCourseProgress, type AcademyProgress } from "../lib/courses/progress";
 import { ACADEMY_LESSONS } from "../lib/courses/curriculum";
+import { isStoryId, normalizeReadingSize, readStoryIds } from "../lib/storage";
 
 type InstallPrompt = Event & {
   prompt: () => Promise<void>;
@@ -123,8 +124,6 @@ export function CyberChronicleApp({
 
   useEffect(() => {
     const storedTheme = window.localStorage.getItem("cyber-chronicle-theme");
-    const storedSaved = window.localStorage.getItem("cyber-chronicle-saved");
-    const storedReadAlerts = window.localStorage.getItem("cyber-chronicle-read-alerts");
     const restore = window.setTimeout(() => {
       setIsOnline(navigator.onLine);
       setRankingNow(Date.now());
@@ -132,21 +131,13 @@ export function CyberChronicleApp({
       setPreferences(loadPreferences(window.localStorage));
       setAcademyProgress(loadCourseProgress(window.localStorage));
       setSavedArchive(readSavedArchive(window.localStorage));
-      const fontSize = window.localStorage.getItem("cyber-chronicle-font-size");
-      if (fontSize === "small" || fontSize === "medium" || fontSize === "large") document.documentElement.dataset.fontSize = fontSize;
+      document.documentElement.dataset.fontSize = normalizeReadingSize(window.localStorage.getItem("cyber-chronicle-font-size"));
       if (storedTheme === "dark") {
         setTheme("dark");
         document.documentElement.dataset.theme = "dark";
       }
-      if (storedSaved) {
-        try {
-          const ids = JSON.parse(storedSaved);
-          if (Array.isArray(ids)) setSaved(ids.filter((id) => typeof id === "string"));
-        } catch { setSaved([]); }
-      }
-      if (storedReadAlerts) {
-        try { setReadAlerts(JSON.parse(storedReadAlerts)); } catch { setReadAlerts([]); }
-      }
+      setSaved(readStoryIds(window.localStorage, "cyber-chronicle-saved"));
+      setReadAlerts(readStoryIds(window.localStorage, "cyber-chronicle-read-alerts"));
     }, 0);
     const timer = window.setInterval(() => void refresh(), 5 * 60_000);
     const resume = () => void refresh();
@@ -180,7 +171,7 @@ export function CyberChronicleApp({
     const checkForLocalNotifications = async () => {
       if (!("serviceWorker" in navigator)) return;
       const registration = await navigator.serviceWorker.ready;
-      registration.active?.postMessage({ type: "CHECK_LOCAL_NOTIFICATIONS", items: data.items });
+      registration.active?.postMessage({ type: "CHECK_LOCAL_NOTIFICATIONS" });
     };
     void checkForLocalNotifications();
     window.addEventListener("cyber-chronicle-notifications-configured", checkForLocalNotifications);
@@ -479,12 +470,9 @@ export function CyberChronicleApp({
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.data && event.data.type === "NAVIGATE") {
-        const url = new URL(event.data.url, window.location.origin);
-        const storyId = url.searchParams.get("story");
-        if (storyId) {
-          void openStoryById(storyId);
-        }
+      if (event.source === navigator.serviceWorker.controller && event.data?.type === "NAVIGATE"
+        && isStoryId(event.data.storyId)) {
+        void openStoryById(event.data.storyId);
       }
     };
     navigator.serviceWorker?.addEventListener("message", handleMessage);

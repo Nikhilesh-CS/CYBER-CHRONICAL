@@ -1,10 +1,12 @@
+import { reviewedHttpsUrl } from "../urls.ts";
+
 export const FETCH_TIMEOUT_MS = 12_000;
 export const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
 
 export async function fetchReviewed(url: string, allowedHosts: string[], fetcher: typeof fetch, init: RequestInit) {
   let current = new URL(url);
   for (let redirects = 0; redirects <= 3; redirects += 1) {
-    if (current.protocol !== "https:" || current.username || current.password || !allowedHosts.includes(current.hostname)) {
+    if (!reviewedHttpsUrl(current.href, allowedHosts)) {
       throw new Error("Upstream redirected to an unreviewed origin");
     }
     const response = await fetcher(current.toString(), { ...init, redirect: "manual" });

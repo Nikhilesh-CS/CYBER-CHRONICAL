@@ -11,6 +11,7 @@ import {
 } from "../../../../lib/preferences";
 import { SettingsHeader } from "../SettingsHeader";
 import { readReaderBackup, STACK_PRODUCTS } from "../../../../lib/watchlist";
+import { normalizeReadingSize, READING_SIZES } from "../../../../lib/storage";
 
 const notificationOptions: readonly [keyof NotificationTypePreferences, string][] = [
   ["criticalAlerts", "Critical alerts"],
@@ -48,7 +49,7 @@ export function PreferencesView({
   saved: string[];
   onImportSaved: (saved: string[]) => void;
 }) {
-  const [fontSize, setFontSize] = useState(() => typeof window === "undefined" ? "medium" : window.localStorage.getItem("cyber-chronicle-font-size") || "medium");
+  const [fontSize, setFontSize] = useState(() => normalizeReadingSize(typeof window === "undefined" ? undefined : window.localStorage.getItem("cyber-chronicle-font-size")));
   const [backupStatus, setBackupStatus] = useState("");
   useEffect(() => { document.documentElement.dataset.fontSize = fontSize; window.localStorage.setItem("cyber-chronicle-font-size", fontSize); }, [fontSize]);
   const toggleDomain = (domain: Domain) => {
@@ -142,7 +143,7 @@ export function PreferencesView({
           )}
         </section>
 
-        <section className="preference-section"><div className="preference-heading"><div><strong>Reading size</strong><small>Adjust article text for comfortable reading</small></div></div><div className="segmented-preference" role="radiogroup" aria-label="Reading size">{["small", "medium", "large"].map((size) => <button key={size} role="radio" aria-checked={fontSize === size} className={fontSize === size ? "active" : ""} onClick={() => setFontSize(size)}>{size[0].toUpperCase() + size.slice(1)}</button>)}</div></section>
+        <section className="preference-section"><div className="preference-heading"><div><strong>Reading size</strong><small>Adjust article text for comfortable reading</small></div></div><div className="segmented-preference" role="radiogroup" aria-label="Reading size">{READING_SIZES.map((size) => <button key={size} role="radio" aria-checked={fontSize === size} className={fontSize === size ? "active" : ""} onClick={() => setFontSize(size)}>{size[0].toUpperCase() + size.slice(1)}</button>)}</div></section>
         <section className="preference-section"><label className="learning-toggle"><input type="checkbox" checked={preferences.learningMode} onChange={(event) => onChange({ ...preferences, learningMode: event.target.checked })} /><span><strong>Learning Mode</strong><small>Show plain-language definitions more prominently while reading</small></span></label></section>
 
         <section className="preference-section">

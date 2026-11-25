@@ -3,6 +3,7 @@ import type { LegacyCertInDefinition } from "../sources.ts";
 import { decodeHtml, fetchReviewed, FETCH_TIMEOUT_MS, MAX_RESPONSE_BYTES } from "./utils.ts";
 import { extractCveIds } from "../vulnerabilities/identifiers.ts";
 import type { CyberMetadata } from "../models.ts";
+import { reviewedHttpsUrl } from "../urls.ts";
 
 const CERT_IN_ORIGIN = "https://www.cert-in.org.in";
 const MAX_ITEMS_PER_SOURCE = 100;
@@ -39,9 +40,7 @@ function decodeUrlEntities(value: string): string {
 
 export function normalizeImageUrl(value: string, baseUrl: string): string | undefined {
   try {
-    const parsed = new URL(decodeUrlEntities(value), baseUrl);
-    if (parsed.protocol !== "https:" || parsed.username || parsed.password) return undefined;
-    return parsed.toString();
+    return reviewedHttpsUrl(new URL(decodeUrlEntities(value), baseUrl).href)?.href;
   } catch {
     return undefined;
   }
@@ -92,13 +91,8 @@ async function fetchArticleImageUrl(
   allowedHosts: string[],
   fetcher: typeof fetch,
 ): Promise<string | undefined> {
-  let requestedUrl: URL;
-  try {
-    requestedUrl = new URL(pageUrl);
-  } catch {
-    return undefined;
-  }
-  if (requestedUrl.protocol !== "https:" || !allowedHosts.includes(requestedUrl.hostname.toLowerCase())) return undefined;
+  const requestedUrl = reviewedHttpsUrl(pageUrl, allowedHosts);
+  if (!requestedUrl) return undefined;
 
   await acquireImageFetchSlot();
   const controller = new AbortController();
@@ -113,8 +107,8 @@ async function fetchArticleImageUrl(
     const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
     if (!contentType.includes("text/html")) return undefined;
 
-    const finalUrl = new URL(response.url || requestedUrl.toString());
-    if (finalUrl.protocol !== "https:" || !allowedHosts.includes(finalUrl.hostname.toLowerCase())) return undefined;
+    const finalUrl = reviewedHttpsUrl(response.url || requestedUrl.href, allowedHosts);
+    if (!finalUrl) return undefined;
 
     const declaredLength = Number(response.headers.get("content-length") ?? 0);
     if (declaredLength > MAX_ARTICLE_RESPONSE_BYTES) return undefined;

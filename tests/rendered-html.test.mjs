@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { createHash } from "node:crypto";
 import { storySlug } from "../lib/story-links.ts";
@@ -40,6 +42,28 @@ test("exports a share page and hashes the bundled inline scripts in the CSP", as
   assert.match(story, /og:type" content="article/);
   assert.match(story, /Original evidence/);
   assert.match(story, /Content-Security-Policy/);
+});
+
+test("every exported HTML document applies its CSP before any scripts", async () => {
+  const out = fileURLToPath(new URL("../out/", import.meta.url));
+  const files = (await readdir(out, { recursive: true })).filter((path) => path.endsWith(".html"));
+  assert.ok(files.length > 3);
+  for (const path of files) {
+    const html = await readFile(join(out, path), "utf8");
+    const policies = [...html.matchAll(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/gi)];
+    assert.equal(policies.length, 1, path);
+    const [policy] = policies;
+    const headEnd = html.search(/<\/head>/i);
+    const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
+    assert.ok(policy.index < headEnd && scripts.every((script) => policy.index < script.index), path);
+    const directives = policy[1].split("; ");
+    assert.ok(directives.includes("base-uri 'none'"), path);
+    assert.ok(directives.includes("script-src-attr 'none'"), path);
+    const scriptSources = directives.find((directive) => directive.startsWith("script-src ")).split(" ").slice(1);
+    const hashes = new Set(scripts.filter(([, attrs, body]) => body && !/(?:^|\s)src\s*=/i.test(attrs))
+      .map(([, , body]) => `'sha256-${createHash("sha256").update(body.replace(/\r\n?/g, "\n")).digest("base64")}'`));
+    assert.deepEqual(new Set(scriptSources), new Set(["'self'", ...hashes]), path);
+  }
 });
 
 test("ships product metadata and removes disposable starter assets", async () => {

@@ -1,4 +1,5 @@
 import { domains, type Domain } from "./editorial.ts";
+import { isStoryId } from "./storage.ts";
 
 export const SETTINGS_PAGES = ["hub", "preferences", "glossary", "about", "creator", "operator", "standards", "sources", "privacy", "disclaimer", "credits"] as const;
 export type SettingsPage = typeof SETTINGS_PAGES[number];
@@ -31,7 +32,7 @@ export function isAppNavigationState(value: unknown): value is AppNavigationStat
     && SETTINGS_PAGES.includes(candidate.settingsPage as SettingsPage)
     && (candidate.domain === "Latest" || domains.includes(candidate.domain as Domain))
     && (candidate.edition === undefined || candidate.edition === "general")
-    && (candidate.storyId === null || typeof candidate.storyId === "string");
+    && (candidate.storyId === null || isStoryId(candidate.storyId));
 }
 
 export function navigationStateFromUrl(currentUrl: string | URL): AppNavigationState {
@@ -43,13 +44,14 @@ export function navigationStateFromUrl(currentUrl: string | URL): AppNavigationS
   const settingsPage = tab === "settings" && SETTINGS_PAGES.includes(requestedSettings) ? requestedSettings : "hub";
   const requestedDomain = url.searchParams.get("section") as Domain;
   const domain = domains.includes(requestedDomain) ? requestedDomain : "Latest";
+  const storyId = url.searchParams.get("story");
   return {
     cyberChronicle: true,
     tab,
     settingsPage,
     domain,
     ...(url.searchParams.get("edition") === "general" ? { edition: "general" as const } : {}),
-    storyId: url.searchParams.get("story"),
+    storyId: isStoryId(storyId) ? storyId : null,
   };
 }
 

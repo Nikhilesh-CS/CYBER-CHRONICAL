@@ -22,6 +22,7 @@ import { JargonHighlighter } from "./JargonHighlighter";
 import { VulnerabilityFacts } from "./VulnerabilityFacts";
 import { storyShareUrl } from "../../../lib/story-links";
 import { SeverityGauge } from "../shared/SeverityGauge";
+import { reviewedHttpsUrl } from "../../../lib/urls";
 
 export function ArticleReader({ item, relatedItems, navigationItems, saved, onSave, onClose, onOpenRelated }: {
   item: RealIntelligenceItem;
@@ -45,6 +46,9 @@ export function ArticleReader({ item, relatedItems, navigationItems, saved, onSa
   const title = plainTitle(item);
   const explanation = beginnerExplanation(item);
   const cyber = item.metadata.type === "cyber" ? item.metadata : undefined;
+  const advisoryUrl = reviewedHttpsUrl(cyber?.advisoryUrl)?.href;
+  const imageUrl = reviewedHttpsUrl(item.imageUrl)?.href;
+  const evidenceLinks = item.evidence.filter((entry) => reviewedHttpsUrl(entry.url));
   const shareUrl = storyShareUrl(item);
   const cycleReadingSize = () => {
     const current = document.documentElement.dataset.fontSize || "medium";
@@ -76,9 +80,9 @@ export function ArticleReader({ item, relatedItems, navigationItems, saved, onSa
         </aside>
         <div className="article-body">
           <header className="article-header">
-            {item.imageUrl && (
+            {imageUrl && (
               <motion.img
-                src={item.imageUrl}
+                src={imageUrl}
                 alt={title}
                 className="article-hero-image news-image article-image-openable"
                 loading="eager"
@@ -163,7 +167,7 @@ export function ArticleReader({ item, relatedItems, navigationItems, saved, onSa
           <section className="article-block">
             <span>WHAT YOU SHOULD DO</span>
             <h2>Practical next steps</h2>
-            {cyber?.action && <p><strong>Advisory guidance</strong> {cyber.action} {cyber.advisoryUrl && <a href={cyber.advisoryUrl}>Official notice</a>}</p>}
+            {cyber?.action && <p><strong>Advisory guidance</strong> {cyber.action} {advisoryUrl && <a href={advisoryUrl}>Official notice</a>}</p>}
             <ol className="action-list">{practicalActions(item).map((action, index) => <li key={action}><b>{index + 1}</b><span>{action}</span></li>)}</ol>
           </section>
 
@@ -172,10 +176,10 @@ export function ArticleReader({ item, relatedItems, navigationItems, saved, onSa
             <h2>Evidence used for this story</h2>
             <p>Cyber Chronicle uses source metadata and writes its own explanation. Open the original evidence for complete technical detail.</p>
             <div>
-              {item.evidence.map((evidence) => <a href={evidence.url} target="_blank" rel="noreferrer" key={evidence.url}><span><strong>{evidence.publisher}</strong><small>{evidence.category.replaceAll("-", " ")} · Published {formatDate(evidence.publishedAt)}</small></span><ExternalLink size={17} /></a>)}
+              {evidenceLinks.map((evidence) => <a href={evidence.url} target="_blank" rel="noopener noreferrer" key={evidence.url}><span><strong>{evidence.publisher}</strong><small>{evidence.category.replaceAll("-", " ")} · Published {formatDate(evidence.publishedAt)}</small></span><ExternalLink size={17} /></a>)}
             </div>
-            {item.evidence.length > 1 && <button className="primary-button" onClick={() => setShowComparison((value) => !value)}>{showComparison ? "Hide comparison" : "Compare sources"}</button>}
-            {showComparison && <SourceComparison item={item} onClose={() => setShowComparison(false)} />}
+            {evidenceLinks.length > 1 && <button className="primary-button" onClick={() => setShowComparison((value) => !value)}>{showComparison ? "Hide comparison" : "Compare sources"}</button>}
+            {showComparison && <SourceComparison evidenceLinks={evidenceLinks} onClose={() => setShowComparison(false)} />}
           </section>
 
           {cyber && <VulnerabilityFacts metadata={cyber} />}
@@ -196,7 +200,7 @@ export function ArticleReader({ item, relatedItems, navigationItems, saved, onSa
 
           <div className="article-end"><span>CC</span><p>Cyber Chronicle — Trusted Cybersecurity News. Simplified.</p><a href={`https://github.com/Nikhilesh-CS/CYBER-CHRONICAL/issues/new?title=Outdated%20story%3A%20${encodeURIComponent(title)}`} target="_blank" rel="noopener noreferrer">Report outdated story ↗</a></div>
         </div>
-        {imageOpen && item.imageUrl && <div className="image-lightbox" role="dialog" aria-modal="true" aria-label="Full-screen story image" onClick={() => setImageOpen(false)}><motion.img src={item.imageUrl} alt={title} /><button onClick={() => setImageOpen(false)} aria-label="Close image"><X size={22} /></button><span><ZoomIn size={15} />Tap anywhere to close</span></div>}
+        {imageOpen && imageUrl && <div className="image-lightbox" role="dialog" aria-modal="true" aria-label="Full-screen story image" onClick={() => setImageOpen(false)}><motion.img src={imageUrl} alt={title} /><button onClick={() => setImageOpen(false)} aria-label="Close image"><X size={22} /></button><span><ZoomIn size={15} />Tap anywhere to close</span></div>}
       </motion.article>
     </motion.div>
   );

@@ -1,4 +1,5 @@
 import type { Lesson } from "./types.ts";
+import { isRecord, readStoredJson } from "../storage.ts";
 
 export const COURSE_PROGRESS_KEY = "cyber-academy-progress-v1";
 export type LessonCompletion = { quizScore: number; exerciseCorrect: boolean; completedAt: string };
@@ -6,22 +7,29 @@ export type AcademyProgress = { completedLessons: Record<string, LessonCompletio
 export const DEFAULT_ACADEMY_PROGRESS: AcademyProgress = { completedLessons: {}, currentLessonId: null, streak: { lastVisitedDate: null, count: 0 } };
 
 export function loadCourseProgress(storage: Pick<Storage, "getItem"> | undefined): AcademyProgress {
-  if (!storage) return DEFAULT_ACADEMY_PROGRESS;
-  try {
-    const value: Partial<AcademyProgress> | null = JSON.parse(storage.getItem(COURSE_PROGRESS_KEY) || "null");
-    if (!value || typeof value !== "object") return DEFAULT_ACADEMY_PROGRESS;
-    const completedLessons = Object.fromEntries(Object.entries(value.completedLessons ?? {}).filter(([, entry]) =>
-      entry && typeof entry.quizScore === "number" && entry.exerciseCorrect === true && typeof entry.completedAt === "string",
-    ));
-    return {
-      completedLessons,
-      currentLessonId: typeof value.currentLessonId === "string" ? value.currentLessonId : null,
-      streak: value.streak && typeof value.streak.lastVisitedDate === "string" && Number.isInteger(value.streak.count) && value.streak.count > 0
-        ? value.streak : DEFAULT_ACADEMY_PROGRESS.streak,
-    };
-  } catch {
-    return DEFAULT_ACADEMY_PROGRESS;
+  const value = readStoredJson(storage, COURSE_PROGRESS_KEY);
+  if (!isRecord(value)) return DEFAULT_ACADEMY_PROGRESS;
+  const completedLessons: AcademyProgress["completedLessons"] = {};
+  for (const [id, entry] of Object.entries(isRecord(value.completedLessons) ? value.completedLessons : {})) {
+    if (!validLessonId(id) || !isRecord(entry)) continue;
+    const { quizScore, exerciseCorrect, completedAt } = entry;
+    if (typeof quizScore === "number" && quizScore >= 0 && quizScore <= 1
+      && exerciseCorrect === true && typeof completedAt === "string" && Number.isFinite(Date.parse(completedAt))) {
+      completedLessons[id] = { quizScore, exerciseCorrect, completedAt };
+    }
   }
+  const { lastVisitedDate, count } = isRecord(value.streak) ? value.streak : {};
+  const validStreak = typeof lastVisitedDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(lastVisitedDate)
+    && Number.isFinite(Date.parse(lastVisitedDate)) && typeof count === "number" && Number.isSafeInteger(count) && count > 0;
+  return {
+    completedLessons,
+    currentLessonId: validLessonId(value.currentLessonId) ? value.currentLessonId : null,
+    streak: validStreak ? { lastVisitedDate, count } : DEFAULT_ACADEMY_PROGRESS.streak,
+  };
+}
+
+function validLessonId(value: unknown): value is string {
+  return typeof value === "string" && /^[a-z0-9-]{1,100}$/i.test(value) && !Object.hasOwn(Object.prototype, value);
 }
 
 export function saveCourseProgress(storage: Pick<Storage, "setItem">, progress: AcademyProgress) {

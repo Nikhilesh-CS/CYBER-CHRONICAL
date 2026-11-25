@@ -1,7 +1,13 @@
-const STATIC_CACHE = "cyber-chronicle-static-v4";
-const DATA_CACHE = "cyber-chronicle-data-v2";
-const OFFLINE_CACHE = "cyber-chronicle-offline-v1";
+const STATIC_CACHE = "cyber-chronicle-static-v5";
+const DATA_CACHE = "cyber-chronicle-data-v3";
+const OFFLINE_CACHE = "cyber-chronicle-offline-v2";
 const NOTIFICATION_CACHE = "cyber-chronicle-notifications-v1";
+const SCOPE = new URL(self.registration.scope);
+const EDITION_URLS = new Map(["news", "intelligence", "search"].map((name) => {
+  const url = new URL(`data/${name}.json`, SCOPE);
+  return [url.pathname, url.href];
+}));
+const NEWS_URL = new URL("data/news.json", SCOPE).href;
 const NOTIFICATION_STATE_URL = new URL(".notification-state", self.registration.scope).href;
 let notificationWork = Promise.resolve();
 const DEFAULT_NOTIFICATION_TOPICS = {
@@ -22,15 +28,61 @@ const DEFAULT_PREFERENCES = {
 };
 
 function normalizePreferences(value) {
-  const input = value && typeof value === "object" ? value : {};
-  const legacyTopics = input.notifications && typeof input.notifications === "object" ? input.notifications : input;
+  const input = record(value) ? value : {};
+  const topics = record(input.notifications) ? input.notifications : input;
+  const notifications = { ...DEFAULT_NOTIFICATION_TOPICS };
+  for (const key of Object.keys(notifications)) {
+    if (Object.hasOwn(topics, key) && typeof topics[key] === "boolean") notifications[key] = topics[key];
+  }
+  const enabledDomains = Array.isArray(input.enabledDomains)
+    ? DEFAULT_PREFERENCES.enabledDomains.filter((domain) => input.enabledDomains.includes(domain))
+    : [];
   return {
-    enabledDomains: Array.isArray(input.enabledDomains) && input.enabledDomains.length ? input.enabledDomains : DEFAULT_PREFERENCES.enabledDomains,
+    enabledDomains: enabledDomains.length ? enabledDomains : DEFAULT_PREFERENCES.enabledDomains,
     severityFloor: input.severityFloor === "high" || input.severityFloor === "critical" ? input.severityFloor : "all",
-    followedState: typeof input.followedState === "string" && input.followedState ? input.followedState : null,
+    followedState: text(input.followedState, 100) || null,
     watchlist: Array.isArray(input.watchlist) ? input.watchlist.filter((value) => typeof value === "string" && /^[a-z]{2,24}$/i.test(value)).slice(0, 20) : [],
-    notifications: { ...DEFAULT_NOTIFICATION_TOPICS, ...legacyTopics },
+    notifications,
   };
+}
+
+function record(value) {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function text(value, limit) {
+  return typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, limit) : "";
+}
+
+function isStoryId(value) {
+  return typeof value === "string" && value.length > 0 && value.length <= 4_096;
+}
+
+function parseUrl(value) {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
+
+function isAppWindow(client) {
+  if (client?.type !== "window" || typeof client.url !== "string") return false;
+  const url = parseUrl(client.url);
+  return !!url && url.origin === SCOPE.origin && url.pathname === SCOPE.pathname;
+}
+
+function isJson(response) {
+  return response?.ok && !response.redirected && /^application\/json(?:\s*;|$)/i.test(response.headers.get("content-type") ?? "");
+}
+
+async function fetchEditionFile(url) {
+  const response = await fetch(url, { cache: "no-store", redirect: "error", signal: AbortSignal.timeout(8_000) }).catch(() => null);
+  if (isJson(response)) {
+    const cache = await caches.open(DATA_CACHE);
+    await cache.put(url, response.clone()).catch(() => undefined);
+  }
+  return response;
 }
 
 function enqueueNotificationWork(task) {
@@ -59,22 +111,19 @@ self.addEventListener("fetch", (event) => {
   if (
     request.method !== "GET"
     || url.origin !== self.location.origin
-    || !url.pathname.startsWith(new URL(self.registration.scope).pathname)
+    || !url.pathname.startsWith(SCOPE.pathname)
   ) {
     return;
   }
 
   /* ---- Network-first, with a fixed URL key for each edition file ---- */
-  if (url.pathname.endsWith("/data/news.json") || url.pathname.endsWith("/data/intelligence.json") || url.pathname.endsWith("/data/search.json")) {
+  const editionUrl = EDITION_URLS.get(url.pathname);
+  if (editionUrl) {
     event.respondWith(
       caches.open(DATA_CACHE).then(async (cache) => {
-        const key = new URL(url.pathname, url.origin).href;
-        const response = await fetch(request, { signal: AbortSignal.timeout(8_000) }).catch(() => null);
-        if (response?.ok && response.headers.get("content-type")?.includes("application/json")) {
-          await cache.put(key, response.clone());
-          return response;
-        }
-        const cached = await cache.match(key);
+        const response = await fetchEditionFile(editionUrl);
+        if (isJson(response)) return response;
+        const cached = await cache.match(editionUrl);
         if (cached) return cached;
         return response || new Response(JSON.stringify({
           state: "unavailable",
@@ -97,7 +146,7 @@ self.addEventListener("fetch", (event) => {
         const cached = await cache.match(request);
         if (cached) return cached;
         const response = await fetch(request);
-        if (response.ok) await cache.put(request, response.clone());
+        if (response.ok && !response.redirected) await cache.put(request, response.clone()).catch(() => undefined);
         return response;
       }),
     );
@@ -109,13 +158,16 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then(async (response) => {
-          if (response.ok) {
+          if (response.ok && !response.redirected && /^text\/html(?:\s*;|$)/i.test(response.headers.get("content-type") ?? "")) {
             const cache = await caches.open(OFFLINE_CACHE);
-            await cache.put(url.pathname, response.clone());
+            await cache.put(url.pathname, response.clone()).catch(() => undefined);
           }
           return response;
         })
-        .catch(async () => (await caches.match(url.pathname)) || (await caches.match(self.registration.scope)) || Response.error()),
+        .catch(async () => {
+          const cache = await caches.open(OFFLINE_CACHE);
+          return (await cache.match(url.pathname)) || (await cache.match(SCOPE.href)) || Response.error();
+        }),
     );
     return;
   }
@@ -127,7 +179,7 @@ self.addEventListener("fetch", (event) => {
         const cached = await cache.match(request);
         if (cached) return cached;
         const response = await fetch(request);
-        if (response.ok) await cache.put(request, response.clone());
+        if (response.ok && !response.redirected) await cache.put(request, response.clone()).catch(() => undefined);
         return response;
       }),
     );
@@ -136,14 +188,21 @@ self.addEventListener("fetch", (event) => {
 
 /* ---- On-device notification engine (no account, token, or backend) ---- */
 async function readNotificationState() {
+  const emptyState = { enabled: false, initialized: false, preferences: DEFAULT_PREFERENCES, seenIds: [] };
   const cache = await caches.open(NOTIFICATION_CACHE);
   const response = await cache.match(NOTIFICATION_STATE_URL);
-  if (!response) return { enabled: false, initialized: false, preferences: DEFAULT_PREFERENCES, seenIds: [] };
+  if (!response) return emptyState;
   try {
     const stored = await response.json();
-    return { seenIds: [], initialized: false, ...stored, preferences: normalizePreferences(stored.preferences) };
+    if (!record(stored)) return emptyState;
+    return {
+      enabled: stored.enabled === true,
+      initialized: stored.initialized === true,
+      preferences: normalizePreferences(stored.preferences),
+      seenIds: Array.isArray(stored.seenIds) ? stored.seenIds.slice(0, 500).filter(isStoryId) : [],
+    };
   } catch {
-    return { enabled: false, initialized: false, preferences: DEFAULT_PREFERENCES, seenIds: [] };
+    return emptyState;
   }
 }
 
@@ -208,19 +267,49 @@ function matchingStack(item, preferences) {
   return preferences.watchlist.filter((product) => text.includes(` ${product.toLowerCase()} `));
 }
 
-async function processNotificationItems(items) {
-  if (!Array.isArray(items)) return;
-  const state = await readNotificationState();
-  if (!state.enabled) return;
+function notificationItem(item) {
+  if (!record(item) || !isStoryId(item.id)) return null;
+  const title = text(item.title, 300);
+  const primaryPublisher = text(item.primaryPublisher, 100);
+  if (!title || !primaryPublisher) return null;
+  const raw = item.metadata;
+  const metadata = record(raw) && raw.type === "cyber" ? {
+    type: "cyber",
+    severity: ["Critical", "High", "Medium", "Low"].includes(raw.severity) ? raw.severity : "Unknown",
+    identifier: text(raw.identifier, 60),
+    affected: text(raw.affected, 350),
+    action: text(raw.action, 500),
+    vulnerabilities: Array.isArray(raw.vulnerabilities) ? raw.vulnerabilities.slice(0, 100).filter(record).map(({ affected }) => ({
+      affected: Array.isArray(affected) ? affected.slice(0, 100).map((value) => text(value, 160)).filter(Boolean) : [],
+    })) : [],
+  } : { type: "general" };
+  const image = typeof item.imageUrl === "string" && /^https:\/\/[^/\s]/i.test(item.imageUrl)
+    && !/[\\\u0000-\u001f\u007f]/u.test(item.imageUrl) ? parseUrl(item.imageUrl) : null;
+  return {
+    id: item.id, title, primaryPublisher, metadata,
+    imageUrl: image?.protocol === "https:" && !image.username && !image.password ? image.href : undefined,
+    aliases: Array.isArray(item.aliases) ? item.aliases.slice(0, 100).filter(isStoryId) : [],
+    domain: text(item.domain, 40),
+    categories: Array.isArray(item.categories) ? item.categories.slice(0, 25).filter((value) => typeof value === "string") : [],
+    category: text(item.category, 40),
+    state: text(item.state, 100),
+    region: text(item.region, 20),
+    verificationStatus: item.verificationStatus,
+    confidence: item.confidence,
+  };
+}
 
-  const currentIds = items.map((item) => item?.id).filter(Boolean).slice(0, 500);
+async function processNotificationItems(items, state) {
+  if (!Array.isArray(items)) return;
+  const currentItems = items.slice(0, 1_000).map(notificationItem).filter(Boolean);
+  const currentIds = currentItems.map(({ id }) => id).slice(0, 500);
   if (!state.initialized) {
     await writeNotificationState({ ...state, initialized: true, seenIds: currentIds });
     return;
   }
 
   const seen = new Set(state.seenIds || []);
-  const newItems = items.filter((item) => item?.id && !seen.has(item.id) && !item.aliases?.some((id) => seen.has(id)));
+  const newItems = currentItems.filter((item) => !seen.has(item.id) && !item.aliases.some((id) => seen.has(id)));
   const preferences = normalizePreferences(state.preferences);
   const eligible = newItems
     .filter((item) => matchesPreferences(item, preferences))
@@ -231,7 +320,7 @@ async function processNotificationItems(items) {
     const classification = classify(item);
     const stack = matchingStack(item, preferences);
     const severity = item.metadata?.type === "cyber" ? item.metadata.severity || "Unknown" : "Unknown";
-    const imageUrl = /^https:\/\//i.test(item.imageUrl || "") ? item.imageUrl : new URL("og.png", self.registration.scope).href;
+    const imageUrl = item.imageUrl ?? new URL("og.png", self.registration.scope).href;
     await self.registration.showNotification(stack.length ? "Cyber Chronicle · My stack" : classification.title, {
       body: `${plainTitle(item)}\n\n${item.primaryPublisher}${severity !== "Unknown" ? ` · ${severity}` : ""}`
         + (stack.length ? `\n\nMy stack: ${stack.join(", ")}` : "")
@@ -242,7 +331,7 @@ async function processNotificationItems(items) {
       badge: new URL("app-icon-192.png", self.registration.scope).href,
       tag: `cyber-chronicle:${item.id}`,
       renotify: classification.type === "CRITICAL_ALERT",
-      data: { url: `${self.registration.scope}?story=${encodeURIComponent(item.id)}`, storyId: item.id },
+      data: { storyId: item.id },
       vibrate: [100, 50, 100],
       actions: [{ action: "view", title: "View alert" }, { action: "dismiss", title: "Dismiss" }],
     });
@@ -250,56 +339,51 @@ async function processNotificationItems(items) {
   await writeNotificationState({ ...state, initialized: true, seenIds: [...new Set([...currentIds, ...(state.seenIds || [])])].slice(0, 500) });
 }
 
+async function checkNotificationEdition(refresh = false) {
+  const state = await readNotificationState();
+  if (!state.enabled) return;
+  const cache = await caches.open(DATA_CACHE);
+  const response = (refresh ? null : await cache.match(NEWS_URL)) ?? await fetchEditionFile(NEWS_URL);
+  if (!isJson(response)) return;
+  const payload = await response.json().catch(() => null);
+  await processNotificationItems(payload?.items, state);
+}
+
 self.addEventListener("message", (event) => {
-  if (event.data?.type === "CONFIGURE_LOCAL_NOTIFICATIONS") {
-    notificationWork = enqueueNotificationWork(() => readNotificationState().then((state) => writeNotificationState({
-        ...state,
-        enabled: Boolean(event.data.enabled),
-        preferences: normalizePreferences(event.data.preferences),
-      })));
-    event.waitUntil(notificationWork);
+  if (!isAppWindow(event.source) || (event.origin && event.origin !== SCOPE.origin) || !record(event.data)) return;
+  if (event.data.type === "CONFIGURE_LOCAL_NOTIFICATIONS") {
+    const { enabled, preferences } = event.data;
+    if (typeof enabled !== "boolean" || !record(preferences)) return;
+    event.waitUntil(enqueueNotificationWork(async () => {
+      const state = await readNotificationState();
+      await writeNotificationState({ ...state, enabled, preferences: normalizePreferences(preferences) });
+    }));
   }
   if (event.data?.type === "CHECK_LOCAL_NOTIFICATIONS") {
-    notificationWork = enqueueNotificationWork(() => processNotificationItems(event.data.items));
-    event.waitUntil(notificationWork);
+    event.waitUntil(enqueueNotificationWork(() => checkNotificationEdition()));
   }
 });
 
 self.addEventListener("periodicsync", (event) => {
   if (event.tag !== "cyber-chronicle-news") return;
-  notificationWork = enqueueNotificationWork(() => fetch(new URL("data/news.json", self.registration.scope), { cache: "no-store" })
-    .then((response) => response.ok ? response.json() : null)
-    .then((payload) => processNotificationItems(payload?.items))
-    .catch(() => undefined));
-  event.waitUntil(notificationWork);
+  event.waitUntil(enqueueNotificationWork(() => checkNotificationEdition(true)));
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   if (event.action === "dismiss") return;
-  
-  let targetUrl = event.notification.data?.url || self.registration.scope;
-  try {
-    const parsedUrl = new URL(targetUrl, self.location.origin);
-    if (parsedUrl.origin !== self.location.origin) {
-      console.warn("Cross-origin notification navigation blocked:", targetUrl);
-      targetUrl = self.registration.scope;
-    } else {
-      targetUrl = parsedUrl.href;
-    }
-  } catch {
-    targetUrl = self.registration.scope;
-  }
-
+  const storyId = event.notification.data?.storyId;
+  const targetUrl = new URL(SCOPE);
+  if (isStoryId(storyId)) targetUrl.searchParams.set("story", storyId);
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+    self.clients.matchAll({ type: "window" }).then((clients) => {
       for (const client of clients) {
-        if (client.url.includes("CYBER-CHRONICAL") && "focus" in client) {
-          client.postMessage({ type: "NAVIGATE", url: targetUrl });
+        if (isAppWindow(client)) {
+          if (isStoryId(storyId)) client.postMessage({ type: "NAVIGATE", storyId });
           return client.focus();
         }
       }
-      return self.clients.openWindow(targetUrl);
+      return self.clients.openWindow(targetUrl.href);
     }),
   );
 });

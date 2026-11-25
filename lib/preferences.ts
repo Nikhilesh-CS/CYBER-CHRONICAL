@@ -1,6 +1,7 @@
 import { domains, type Domain } from "./editorial.ts";
 import { INDIA_STATE_NAMES } from "./geo/india-states.ts";
 import { normalizeWatchlist, type StackProduct } from "./watchlist.ts";
+import { isRecord, readStoredJson } from "./storage.ts";
 
 export const PREFERENCES_KEY = "cyber-chronicle-preferences-v1";
 export const LEGACY_NOTIFICATION_PREFERENCES_KEY = "cyber-chronicle-notification-preferences";
@@ -50,20 +51,28 @@ export const DEFAULT_PREFERENCES: AppPreferences = {
 };
 
 export function normalizePreferences(value: unknown, legacyNotifications?: unknown): AppPreferences {
-  const input = value && typeof value === "object" ? value as Partial<AppPreferences> : {};
-  const enabledDomains = Array.isArray(input.enabledDomains)
-    ? domains.filter((domain) => input.enabledDomains?.includes(domain))
+  const input = isRecord(value) ? value : {};
+  const requestedDomains = input.enabledDomains;
+  const enabledDomains = Array.isArray(requestedDomains)
+    ? domains.filter((domain) => requestedDomains.includes(domain))
     : [...domains];
   const severityFloor: SeverityFloor = input.severityFloor === "high" || input.severityFloor === "critical"
     ? input.severityFloor
     : "all";
-  const legacy = legacyNotifications && typeof legacyNotifications === "object" ? legacyNotifications : {};
-  const notificationInput = input.notifications && typeof input.notifications === "object" ? input.notifications : legacy;
+  const legacy = isRecord(legacyNotifications) ? legacyNotifications : {};
+  const notificationInput = isRecord(input.notifications) ? input.notifications : legacy;
+  const notifications = { ...DEFAULT_NOTIFICATION_PREFERENCES };
+  for (const key of Object.keys(notifications) as (keyof NotificationTypePreferences)[]) {
+    const current = notificationInput[key];
+    const previous = legacy[key];
+    if (Object.hasOwn(notificationInput, key) && typeof current === "boolean") notifications[key] = current;
+    else if (Object.hasOwn(legacy, key) && typeof previous === "boolean") notifications[key] = previous;
+  }
   return {
     enabledDomains: enabledDomains.length > 0 ? enabledDomains : [...domains],
     severityFloor,
     followedState: typeof input.followedState === "string" && INDIA_STATE_NAMES.includes(input.followedState.trim()) ? input.followedState.trim() : null,
-    notifications: { ...DEFAULT_NOTIFICATION_PREFERENCES, ...notificationInput },
+    notifications,
     learningMode: input.learningMode === true,
     watchlist: normalizeWatchlist(input.watchlist),
     density: input.density === "compact" ? "compact" : "comfortable",
@@ -71,16 +80,15 @@ export function normalizePreferences(value: unknown, legacyNotifications?: unkno
 }
 
 export function loadPreferences(storage: Pick<Storage, "getItem" | "setItem" | "removeItem">): AppPreferences {
+  const legacy = readStoredJson(storage, LEGACY_NOTIFICATION_PREFERENCES_KEY);
+  const preferences = normalizePreferences(readStoredJson(storage, PREFERENCES_KEY), legacy);
   try {
-    const stored = JSON.parse(storage.getItem(PREFERENCES_KEY) || "null");
-    const legacy = JSON.parse(storage.getItem(LEGACY_NOTIFICATION_PREFERENCES_KEY) || "null");
-    const preferences = normalizePreferences(stored, legacy);
     storage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
-    if (legacy) storage.removeItem(LEGACY_NOTIFICATION_PREFERENCES_KEY);
-    return preferences;
+    if (isRecord(legacy)) storage.removeItem(LEGACY_NOTIFICATION_PREFERENCES_KEY);
   } catch {
-    return DEFAULT_PREFERENCES;
+    // Retain validated preferences for this session when storage is read-only or full.
   }
+  return preferences;
 }
 
 export function savePreferences(storage: Pick<Storage, "setItem">, preferences: AppPreferences) {

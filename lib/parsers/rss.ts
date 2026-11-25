@@ -4,6 +4,7 @@ import { decodeHtml, stableHash, fetchReviewed, FETCH_TIMEOUT_MS, MAX_RESPONSE_B
 import { OFFICIAL_CYBER_TOPIC, TOPIC_FILTERS, enhanceCategories } from "../classifiers.ts";
 import { normalizeImageUrl } from "./html.ts";
 import { extractCveIds } from "../vulnerabilities/identifiers.ts";
+import { reviewedHttpsUrl } from "../urls.ts";
 
 function xmlField(block: string, field: string): string {
   const match = new RegExp(`<${field}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${field}>`, "i").exec(block);
@@ -106,13 +107,8 @@ export function buildFeedItems(records: FeedRecord[], definition: SourceDefiniti
     const filter = definition.trustTier === 1 ? OFFICIAL_CYBER_TOPIC : TOPIC_FILTERS.cyber;
     if (definition.strictFilter && !filter.test(haystack)) continue;
     
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(link);
-    } catch {
-      continue;
-    }
-    if (parsedUrl.protocol !== "https:" || !definition.allowedHosts.includes(parsedUrl.hostname.toLowerCase())) continue;
+    const parsedUrl = reviewedHttpsUrl(link, definition.allowedHosts);
+    if (!parsedUrl) continue;
     
     const timestamp = Date.parse(publishedRaw);
     if (!Number.isFinite(timestamp)) continue;

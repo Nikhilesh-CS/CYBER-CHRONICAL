@@ -4,6 +4,7 @@ import { buildStorySearchIndex, formatDate, plainTitle, verificationLabel } from
 import { beginnerExplanation } from "../lib/explanations.ts";
 import { SITE_BASE_PATH, SITE_ORIGIN, cvePath, storyPath, storySlug } from "../lib/story-links.ts";
 import { extractCveIds } from "../lib/vulnerabilities/identifiers.ts";
+import { reviewedHttpsUrl } from "../lib/urls.ts";
 
 const { items, generatedAt } = JSON.parse(await readFile("public/data/news.json", "utf8"));
 const home = `${SITE_BASE_PATH}/`;
@@ -15,7 +16,6 @@ const escaped = (value) => String(value ?? "").replace(/[&<>"']/g, (character) =
 const link = (url, label) => `<a href="${escaped(url)}">${escaped(label)}</a>`;
 const list = (entries) => `<ul>${entries.map((entry) => `<li>${entry}</li>`).join("")}</ul>`;
 const section = (title, content) => `<section><h2>${escaped(title)}</h2>${content}</section>`;
-const httpsOnly = (value) => typeof value === "string" && /^https:\/\//i.test(value);
 
 async function page(path, title, description, body, { canonical = path, article = false } = {}) {
   const file = resolve("out", path.slice(SITE_BASE_PATH.length + 1), "index.html");
@@ -46,7 +46,7 @@ for (const item of items) {
     section("What happened", `<p>${escaped(explanation)}</p>`),
     cyber?.affected && !/^(?:check the linked source|specified in the official)/i.test(cyber.affected) ? section("Affected products", list(cyber.affected.split(" | ").map(escaped))) : "",
     cyber?.action ? section("Official mitigation guidance", `<p>${escaped(cyber.action)}</p>`) : "",
-    section("Original evidence", list(item.evidence.filter((record) => httpsOnly(record.url)).map((record) => link(record.url, record.publisher)))),
+    section("Original evidence", list(item.evidence.filter((record) => reviewedHttpsUrl(record.url)).map((record) => link(record.url, record.publisher)))),
     ids.length ? section("Vulnerability records", list(ids.map((id) => link(cvePath(id), id)))) : "",
   ].join("");
   await page(storyPath(item), plainTitle(item), explanation.slice(0, 220), body, { article: true });
@@ -62,14 +62,14 @@ for (const [id, stories] of cveIndex) {
   const record = stories.flatMap(({ metadata }) => metadata.vulnerabilities ?? []).find((entry) => entry.id === id);
   const facts = [
     `<p>Severity ${escaped(record?.severity ?? "unknown")}${record?.cvssScore !== undefined ? ` · CVSS ${escaped(record.cvssScore)}/10` : ""}</p>`,
-    `<p>${record?.kev && httpsOnly(record.kev.url) ? `<strong class="known">Known exploitation</strong> · ${link(record.kev.url, "CISA KEV")} · Added ${escaped(formatDate(record.kev.dateAdded))}` : "KEV match unavailable in this edition."}</p>`,
-    `<p>${record?.epss && httpsOnly(record.epss.url) ? link(record.epss.url, `EPSS estimates ${(record.epss.probability * 100).toFixed(2)}% likelihood in 30 days · ${formatDate(record.epss.date)}`) : "EPSS score unavailable in this edition."}</p>`,
+    `<p>${record?.kev && reviewedHttpsUrl(record.kev.url) ? `<strong class="known">Known exploitation</strong> · ${link(record.kev.url, "CISA KEV")} · Added ${escaped(formatDate(record.kev.dateAdded))}` : "KEV match unavailable in this edition."}</p>`,
+    `<p>${record?.epss && reviewedHttpsUrl(record.epss.url) ? link(record.epss.url, `EPSS estimates ${(record.epss.probability * 100).toFixed(2)}% likelihood in 30 days · ${formatDate(record.epss.date)}`) : "EPSS score unavailable in this edition."}</p>`,
     record?.affected?.length ? section("Affected products", list(record.affected.map(escaped))) : "",
     record?.kev?.action || record?.action ? section("Official mitigation guidance", `<p>${escaped(record.kev?.action || record.action)}</p>`) : "",
     section("Reference records", list([
       link(`https://www.cve.org/CVERecord?id=${id}`, "CVE record"),
-      ...(httpsOnly(record?.nvdUrl) ? [link(record.nvdUrl, "NVD record")] : []),
-      ...(httpsOnly(record?.vendorUrl) ? [link(record.vendorUrl, "Vendor advisory")] : []),
+      ...(reviewedHttpsUrl(record?.nvdUrl) ? [link(record.nvdUrl, "NVD record")] : []),
+      ...(reviewedHttpsUrl(record?.vendorUrl) ? [link(record.vendorUrl, "Vendor advisory")] : []),
     ])),
     section("Cyber Chronicle coverage", list(stories.map((story) => `${link(storyPath(story), plainTitle(story))} · ${escaped(story.primaryPublisher)}`))),
   ].join("");

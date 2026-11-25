@@ -90,7 +90,6 @@ export function NotificationManager({ preferences }: { preferences: AppPreferenc
         icon: new URL("app-icon-192.png", registration.scope).href,
         badge: new URL("app-icon-192.png", registration.scope).href,
         tag: "cyber-chronicle:test",
-        data: { url: registration.scope },
       });
     } catch (error) {
       console.error("Test notification failed", error);
