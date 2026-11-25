@@ -17,7 +17,7 @@
     "lint": "eslint . --ignore-pattern out --ignore-pattern dist --ignore-pattern .next --ignore-pattern .venv"
   },
   "dependencies": {
-    "lucide-react": "^1.25.0",
+    "lucide-react": "^1.77.0",
     "motion": "^12.23.24",
     "next": "^16.4.5",
     "react": "19.2.6",
